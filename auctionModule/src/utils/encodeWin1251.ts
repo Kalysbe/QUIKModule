@@ -1,0 +1,49 @@
+const CP1251_SPECIAL: Record<number, number> = {
+  0x0401: 0xa8, // Ё
+  0x0451: 0xb8, // ё
+  0x0404: 0xaa, // Є
+  0x0454: 0xba, // є
+  0x0406: 0xb2, // І
+  0x0456: 0xb3, // і
+  0x0407: 0xaf, // Ї
+  0x0457: 0xbf, // ї
+  0x0490: 0xa5, // Ґ
+  0x0491: 0xb4, // ґ
+  0x040e: 0xa1, // Ў
+  0x045e: 0xb9, // ў
+  0x2116: 0xb9, // №
+  0x00a0: 0xa0,
+  0x00ab: 0xab,
+  0x00bb: 0xbb,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201c: 0x93,
+  0x201d: 0x94,
+  0x2026: 0x85,
+  0x20ac: 0x88,
+};
+
+function unicodeToCp1251(code: number): number {
+  if (code < 0x80) return code;
+
+  const special = CP1251_SPECIAL[code];
+  if (special !== undefined) return special;
+
+  if (code >= 0x0410 && code <= 0x042f) return code - 0x0410 + 0xc0;
+  if (code >= 0x0430 && code <= 0x044f) return code - 0x0430 + 0xe0;
+
+  return 0x3f;
+}
+
+export function encodeWin1251(text: string): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(new ArrayBuffer(text.length));
+  let offset = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    bytes[offset++] = unicodeToCp1251(text.charCodeAt(i));
+  }
+
+  return bytes.subarray(0, offset);
+}

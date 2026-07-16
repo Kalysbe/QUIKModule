@@ -1,0 +1,25 @@
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.icon {
+  font-size: 2.5rem;
+  opacity: 0.8;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--kse-brand-dark);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 400px;
+}

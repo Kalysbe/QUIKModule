@@ -1,0 +1,39 @@
+.nav {
+  margin-bottom: 0.5rem;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.link {
+  color: #156c79;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.current {
+  color: #5d666f;
+  font-weight: 600;
+}
+
+.sep {
+  color: #9aa3ab;
+}

@@ -1,0 +1,41 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.selectorLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #5c6369;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.selectorControl {
+  min-width: min(320px, 100%);
+  padding: 0.42rem 0.55rem;
+  border: 1px solid #c5cdd3;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.82rem;
+  color: #1f2326;
+}
+
+.selectorControl:focus {
+  outline: 2px solid rgba(21, 108, 121, 0.25);
+  border-color: #3b919d;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #5f676e;
+}

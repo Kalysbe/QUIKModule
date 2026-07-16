@@ -1,0 +1,59 @@
+.loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 280px;
+  padding: 3rem;
+}
+
+.ring {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(87, 182, 192, 0.2);
+  border-top-color: var(--kse-brand);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.text {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeletonGrid {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 900px;
+}
+
+.skeletonRow {
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    rgba(87, 182, 192, 0.08) 0%,
+    rgba(87, 182, 192, 0.18) 50%,
+    rgba(87, 182, 192, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

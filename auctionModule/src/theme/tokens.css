@@ -1,0 +1,116 @@
+:root {
+  --kse-brand: #57b6c0;
+  --kse-brand-dark: #3d9aa4;
+  --kse-brand-light: #7ecbd3;
+  --kse-brand-glow: rgba(87, 182, 192, 0.35);
+
+  --color-bg: #f4fbfc;
+  --color-bg-elevated: rgba(255, 255, 255, 0.72);
+  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-border: rgba(87, 182, 192, 0.22);
+  --color-text: #0f2a2e;
+  --color-text-muted: #5a7a80;
+  --color-text-inverse: #ffffff;
+
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'Consolas', 'SF Mono', monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --shadow-sm: 0 2px 8px rgba(15, 42, 46, 0.06);
+  --shadow-md: 0 8px 32px rgba(87, 182, 192, 0.12);
+  --shadow-glow: 0 0 24px var(--kse-brand-glow);
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: linear-gradient(160deg, #eef9fa 0%, #ffffff 45%, #f0fafb 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(87, 182, 192, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(87, 182, 192, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--kse-brand-dark);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--kse-brand);
+}
+
+h1,
+h2,
+h3 {
+  color: var(--kse-brand-dark);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+select {
+  font-family: inherit;
+}
+
+@media print {
+  body::before {
+    display: none;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .report-print-root,
+  .report-print-root * {
+    visibility: visible;
+  }
+
+  .report-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

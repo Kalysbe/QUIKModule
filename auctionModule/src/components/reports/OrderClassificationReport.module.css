@@ -1,0 +1,143 @@
+.report {
+  border: 1px solid #bcc5ca;
+  background: #fff;
+}
+
+.printArea {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.title {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1f2326;
+}
+
+.reportDate {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: #1f2326;
+  white-space: nowrap;
+}
+
+.sectionTitle {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1f2326;
+}
+
+.infoTable,
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.infoTable {
+  margin-bottom: 1.1rem;
+}
+
+.infoTable td {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid #c5cdd3;
+  vertical-align: middle;
+}
+
+.infoLabel {
+  width: 52%;
+  color: #1f2326;
+}
+
+.infoValue {
+  font-family: var(--font-mono);
+  color: #1f2326;
+}
+
+.dataTable th,
+.dataTable td {
+  padding: 0.32rem 0.55rem;
+  border: 1px solid #c5cdd3;
+  vertical-align: middle;
+}
+
+.dataTable th {
+  font-weight: 600;
+  text-align: center;
+  background: #eef2f5;
+  color: #1f2326;
+}
+
+.dataTable td {
+  color: #1f2326;
+}
+
+.dealerCell {
+  text-align: left;
+}
+
+.numericCell {
+  font-family: var(--font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.totalRow td {
+  font-weight: 700;
+}
+
+.emptyRow td {
+  text-align: center;
+  font-style: italic;
+  color: #5f676e;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem 1rem;
+  border-top: 1px solid #d6dee3;
+}
+
+.printButton {
+  padding: 0.45rem 1rem;
+  border: 1px solid #e07a2f;
+  border-radius: 999px;
+  background: #fff;
+  color: #e07a2f;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.printButton:hover {
+  background: #fff4ec;
+}
+
+@media print {
+  .actions {
+    display: none;
+  }
+
+  .report {
+    border: none;
+  }
+
+  .printArea {
+    padding: 0;
+  }
+}

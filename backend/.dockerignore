@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+.env
+.env.*.local
+logs/*
+!logs/.gitkeep
+lims/*
+!lims/.gitkeep
+coverage
+.nyc_output
+.git
+.gitignore
+.vscode
+.idea
+*.md
+__tests__

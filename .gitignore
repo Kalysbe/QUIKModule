@@ -1,27 +1,42 @@
-# Dependencies
+# === Общее для всего монорепозитория (backend/, auctionModule/) ===
+
+# Локальные копии / устаревшие папки (не в репозитории)
+src/
+frontend/
+
+# Зависимости
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Environment variables
+# Переменные окружения (секреты) — храните .env только локально
 .env
 .env.local
 .env.*.local
+!.env.example
 
-# Logs
+# Логи приложения (backend/logs) и PM2
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pm2-*.log
 
-# Coverage
+# Файлы лимитов QUIK, генерируемые в рантайме (backend/lims) — сами .lim не коммитим,
+# кроме случаев, когда это осознанно нужно; папку сохраняем через .gitkeep
+backend/lims/*
+!backend/lims/.gitkeep
+
+# Тестовое покрытие
 coverage/
 .nyc_output/
 
-# IDE
+# Сборки фронтенда (auctionModule/dist)
+dist/
+dist-ssr/
+build/
+
+# IDE / редакторы
 .vscode/
 .idea/
 *.swp
@@ -32,13 +47,11 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# PM2
+# PM2 runtime
 .pm2/
 
-# Build
-dist/
-build/
-
-# Test
+# Тесты
 *.test.js.snap
 
+# Docker
+docker-compose.override.yml

@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: quikmodule-backend:local
+    container_name: quikmodule-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Всегда фиксируем сетевые/докер-специфичные значения здесь, даже если backend/.env
+      # содержит другие значения для запуска без Docker (SERVER_HOST=127.0.0.1 и т.д.)
+      NODE_ENV: production
+      RUNNING_IN_DOCKER: "true"
+      SERVER_HOST: 0.0.0.0
+      PORT: 5000
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    volumes:
+      # Логи переживают пересборку/перезапуск контейнера
+      - backend_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  auction:
+    build:
+      context: ./auctionModule
+    image: quikmodule-auction:local
+    container_name: quikmodule-auction
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${AUCTION_PORT:-8080}:80"
+
+volumes:
+  backend_logs:

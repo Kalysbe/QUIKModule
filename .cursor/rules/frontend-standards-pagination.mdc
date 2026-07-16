@@ -1,0 +1,41 @@
+---
+description: Во всех списках фронтенда использовать TablePaginationCustom
+globs: frontend/src/**/*.{js,jsx,ts,tsx}
+alwaysApply: false
+---
+
+# Pagination standard (frontend)
+
+## Требование
+
+- Для любых экранов/виджетов со списками и пагинацией **используй `TablePaginationCustom`** вместо прямого `TablePagination`/самописной пагинации.
+- Параметры `page`, `rowsPerPage` (или `limit`) должны быть **управляемыми**, а изменение пагинации — вызывать перезагрузку данных.
+- Для таблиц MUI `Table`/`TableContainer` пагинация должна стоять внизу карточки/контейнера и работать консистентно на всех “list view”.
+
+## Рекомендованный паттерн
+
+- Данные грузятся с сервера с параметрами `limit` и `offset = page * limit`.
+- `TablePaginationCustom` управляет `page` и `rowsPerPage`.
+
+## Пример
+
+```jsx
+const [page, setPage] = useState(0);
+const [rowsPerPage, setRowsPerPage] = useState(25);
+
+useEffect(() => {
+  axios.get(url, { params: { limit: rowsPerPage, offset: page * rowsPerPage } });
+}, [page, rowsPerPage]);
+
+<TablePaginationCustom
+  count={total}
+  page={page}
+  rowsPerPage={rowsPerPage}
+  onPageChange={(e, nextPage) => setPage(nextPage)}
+  onRowsPerPageChange={(e) => {
+    setRowsPerPage(Number(e.target.value));
+    setPage(0);
+  }}
+/>;
+```
+

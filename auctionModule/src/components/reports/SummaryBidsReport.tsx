@@ -1,8 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getFirmsDirectory } from '@/api/directories';
 import type { Auction, BuyOrder } from '@/types/auction';
 import { formatReportMoney, formatReportPercent, formatShortDate } from '@/utils/format';
 import { downloadCsv } from '@/utils/download';
-import { buildSummaryBidsReport } from './buildSummaryBidsReport';
+import {
+  buildSummaryBidsReport,
+  formatCirculationYears,
+  type FirmStatusLookup,
+} from './buildSummaryBidsReport';
 import styles from './SummaryBidsReport.module.css';
 
 interface SummaryBidsReportProps {
@@ -18,9 +23,37 @@ function formatQty(value: number): string {
 }
 
 export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps) {
+  const [firmStatuses, setFirmStatuses] = useState<Record<string, FirmStatusLookup>>(
+    {},
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const firms = await getFirmsDirectory();
+        if (cancelled) return;
+        const map: Record<string, FirmStatusLookup> = {};
+        for (const firm of firms) {
+          if (!firm.firm_id) continue;
+          map[firm.firm_id] = {
+            statusName: firm.status_name,
+            resident: firm.resident,
+          };
+        }
+        setFirmStatuses(map);
+      } catch {
+        if (!cancelled) setFirmStatuses({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const report = useMemo(
-    () => buildSummaryBidsReport(auction, buyOrders),
-    [auction, buyOrders],
+    () => buildSummaryBidsReport(auction, buyOrders, firmStatuses),
+    [auction, buyOrders, firmStatuses],
   );
 
   const handlePrint = () => {
@@ -34,11 +67,18 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
       ['Вид ГЦБ', report.securityKind],
       [
         'Срок обращения ГЦБ',
-        report.circulationDays != null ? `${report.circulationDays} дня` : '—',
+        formatCirculationYears(report.circulationYears),
       ],
       ['Регистрационный номер', report.registrationNumber],
       ['Количество ГЦБ (в штуках)', report.securitiesQuantity],
       ['Объем предложения', report.offerVolume],
+      ['Количество участников / Из них', report.participantCount],
+      ['Финансовые институты', report.financialInstitutions],
+      [
+        'Институциональные инвесторы, в том числе страховые компании',
+        report.institutionalInvestors,
+      ],
+      ['Инвесторы резидент/Нерезидент', `${report.residents}/${report.nonResidents}`],
       [],
       [
         'Основа',
@@ -48,18 +88,18 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
         '% от общего объема',
       ],
       [
-        'На неконкурентной основе',
-        report.nonCompetitive.quantity,
-        report.nonCompetitive.nominalValue,
-        report.nonCompetitive.actualValue,
-        report.nonCompetitive.percentOfTotal,
-      ],
-      [
         'На конкурентной основе',
         report.competitive.quantity,
         report.competitive.nominalValue,
         report.competitive.actualValue,
         report.competitive.percentOfTotal,
+      ],
+      [
+        'На неконкурентной основе',
+        report.nonCompetitive.quantity,
+        report.nonCompetitive.nominalValue,
+        report.nonCompetitive.actualValue,
+        report.nonCompetitive.percentOfTotal,
       ],
       [
         'Всего',
@@ -110,9 +150,7 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
             <tr>
               <td className={styles.infoLabel}>Срок обращения ГЦБ</td>
               <td className={styles.infoValue}>
-                {report.circulationDays != null
-                  ? `${report.circulationDays.toLocaleString('ru-RU')} дня`
-                  : '—'}
+                {formatCirculationYears(report.circulationYears)}
               </td>
             </tr>
             <tr>
@@ -140,12 +178,13 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
               </td>
             </tr>
             <tr>
-              <td className={styles.infoLabel}>Количество участников</td>
-              <td className={styles.infoValue}>{report.participantCount}</td>
-            </tr>
-            <tr>
-              <td className={styles.infoLabel}>Из них:</td>
-              <td className={styles.infoValue}>{report.participantCount}</td>
+              <td className={styles.infoLabel}>
+                Количество участников
+                <div className={styles.infoNestedLabel}>Из них:</div>
+              </td>
+              <td className={`${styles.infoValue} ${styles.infoValueBottom}`}>
+                {report.participantCount}
+              </td>
             </tr>
             <tr>
               <td className={styles.infoSubLabel}>Финансовые институты</td>
@@ -158,11 +197,7 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
               <td className={styles.infoValue}>{report.institutionalInvestors}</td>
             </tr>
             <tr>
-              <td className={styles.infoSubLabel}>Инвесторы</td>
-              <td className={styles.infoValue}>{report.investors}</td>
-            </tr>
-            <tr>
-              <td className={styles.infoLabel}>резидент/Нерезидент</td>
+              <td className={styles.infoSubLabel}>Инвесторы резидент/Нерезидент</td>
               <td className={styles.infoValue}>
                 {report.residents}/{report.nonResidents}
               </td>
@@ -183,21 +218,6 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
           </thead>
           <tbody>
             <tr>
-              <td>На неконкурентной основе</td>
-              <td className={styles.numericCell}>
-                {formatQty(report.nonCompetitive.quantity)}
-              </td>
-              <td className={styles.numericCell}>
-                {formatReportMoney(report.nonCompetitive.nominalValue)}
-              </td>
-              <td className={styles.numericCell}>
-                {formatReportMoney(report.nonCompetitive.actualValue)}
-              </td>
-              <td className={styles.numericCell}>
-                {formatReportPercent(report.nonCompetitive.percentOfTotal)} %
-              </td>
-            </tr>
-            <tr>
               <td>На конкурентной основе</td>
               <td className={styles.numericCell}>
                 {formatQty(report.competitive.quantity)}
@@ -210,6 +230,21 @@ export function SummaryBidsReport({ auction, buyOrders }: SummaryBidsReportProps
               </td>
               <td className={styles.numericCell}>
                 {formatReportPercent(report.competitive.percentOfTotal)} %
+              </td>
+            </tr>
+            <tr>
+              <td>На неконкурентной основе</td>
+              <td className={styles.numericCell}>
+                {formatQty(report.nonCompetitive.quantity)}
+              </td>
+              <td className={styles.numericCell}>
+                {formatReportMoney(report.nonCompetitive.nominalValue)}
+              </td>
+              <td className={styles.numericCell}>
+                {formatReportMoney(report.nonCompetitive.actualValue)}
+              </td>
+              <td className={styles.numericCell}>
+                {formatReportPercent(report.nonCompetitive.percentOfTotal)} %
               </td>
             </tr>
             <tr className={styles.totalRow}>

@@ -1,7 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import { AuthGuard, GuestGuard } from '@/auth/AuthGuard';
 import { AppShell } from '@/components/layout/AppShell';
-import { AuctionDetailPage, HomePage, LoginPage } from './lazyPages';
+import { AuctionDetailPage, DirectoriesPage, HomePage, LoginPage } from './lazyPages';
 import { PageSuspense } from './PageSuspense';
 
 export const routes: RouteObject[] = [
@@ -39,6 +39,14 @@ export const routes: RouteObject[] = [
             element: (
               <PageSuspense>
                 <AuctionDetailPage />
+              </PageSuspense>
+            ),
+          },
+          {
+            path: 'directories',
+            element: (
+              <PageSuspense>
+                <DirectoriesPage />
               </PageSuspense>
             ),
           },

@@ -17,6 +17,7 @@ const COLUMN_CANDIDATES = {
   ClientCode: ["ClientCode", "clientcode", "client_code", "BrokerClientCode", "brokerclientcode", "broker_client_code"],
   Account: ["Account", "account", "TradeAccount", "tradeaccount", "TradeAcc", "tradeacc", "TrdAcc", "trdacc"],
   FirmName: ["FirmName", "firmname", "firm_name"],
+  FirmId: ["FirmId", "firmid", "firm_id"],
 };
 
 /** Находит первую существующую колонку из кандидатов (с учётом регистра) */
@@ -47,6 +48,7 @@ const OUTPUT_COLUMNS = [
   "ClientCode",
   "Account",
   "FirmName",
+  "FirmId",
 ];
 const ACTIVE_STATE = "Активна";
 const TRADE_TABLE_NAME = "Trades";

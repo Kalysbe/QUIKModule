@@ -10,6 +10,7 @@ function makeOrder(partial: Partial<BuyOrder> & Pick<BuyOrder, 'orderId'>): BuyO
     amount: 0,
     desiredYield: 0,
     account: '1',
+    firmId: 'DEALER',
     firmName: 'Dealer',
     dealerName: 'Dealer',
     submittedAt: '12:00:00',
@@ -35,5 +36,36 @@ describe('buildOrderClassificationReport', () => {
 
     expect(report.issueVolume).toBe(54_343);
     expect(report.nonCompetitiveAmount).toBe(16_302.9);
+  });
+
+  it('sets nominal value as quantity * 100', () => {
+    const auction: Auction = {
+      SecCode: 'GBA02280720',
+      TradeDate: '2026-07-17',
+      issuesize: '6000000',
+    };
+
+    const report = buildOrderClassificationReport(auction, [
+      makeOrder({
+        orderId: '1',
+        price: 86.3,
+        quantity: 5_178_000,
+        amount: 999_999,
+        desiredYield: 13,
+        firmName: 'AZDK',
+      }),
+      makeOrder({
+        orderId: '2',
+        price: 86.3,
+        quantity: 9_993.54,
+        amount: 1,
+        desiredYield: 13,
+        firmName: 'Senti',
+      }),
+    ]);
+
+    expect(report.rows[0].nominalValue).toBe(517_800_000);
+    expect(report.rows[1].nominalValue).toBe(999_354);
+    expect(report.totalNominalValue).toBe(518_799_354);
   });
 });

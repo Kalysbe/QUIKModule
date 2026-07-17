@@ -10,6 +10,7 @@ function makeOrder(partial: Partial<BuyOrder> & Pick<BuyOrder, 'orderId'>): BuyO
     amount: 0,
     desiredYield: 0,
     account: '1',
+    firmId: 'DEALER',
     firmName: 'Dealer',
     dealerName: 'Dealer',
     submittedAt: '12:00:00',

@@ -18,6 +18,7 @@ function makeOrder(overrides: Partial<BuyOrder> = {}): BuyOrder {
     amount: 214_420_000,
     desiredYield: 10.6,
     account: 'A1',
+    firmId: 'DEALER',
     firmName: 'Dealer',
     dealerName: 'Client',
     submittedAt: '10:00:00',

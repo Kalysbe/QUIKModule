@@ -5,6 +5,7 @@ import auctionsRoutes from "./routes/auctionsRoutes.js";
 import ordersRoutes from "./routes/ordersRoutes.js";
 import paramsRoutes from "./routes/paramsRoutes.js";
 import kseRoutes from "./routes/kseRoutes.js";
+import directoriesRoutes from "./routes/directoriesRoutes.js";
 import { requestLogger } from "./utils/logger.js";
 import { ipWhitelistMiddleware } from "./middleware/ipWhitelist.js";
 import { apiLoggerMiddleware } from "./middleware/apiLogger.js";
@@ -109,6 +110,7 @@ app.use("/api/auctions", auctionsRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/params", paramsRoutes);
 app.use("/api/kse", kseRoutes);
+app.use("/api/kse/directories", directoriesRoutes);
 
 // Обработка 404
 app.use(notFoundHandler);

@@ -28,6 +28,10 @@ export function canAccessFullAuction(role: UserRole | undefined): boolean {
   return role === 'admin' || role === 'operator';
 }
 
+export function canAccessDirectories(role: UserRole | undefined): boolean {
+  return role === 'admin' || role === 'operator';
+}
+
 export function getUserDisplayName(user: AuthUser | null): string {
   if (!user) return '';
   const name = `${user.first_name} ${user.last_name}`.trim();

@@ -59,7 +59,7 @@ export function buildOrderClassificationReport(
 
   const rows: OrderClassificationRow[] = sortedOrders.map((order) => ({
     dealerName: order.firmName || '—',
-    nominalValue: order.amount,
+    nominalValue: round2(order.quantity * 100),
     bidPrice: order.price,
     yieldPercent: getOrderYield(order),
   }));

@@ -30,6 +30,7 @@ interface OrderApiItem {
   ClientCode?: string;
   ClientName?: string;
   FirmName?: string;
+  FirmId?: string;
 }
 
 interface TradeApiItem {
@@ -49,6 +50,7 @@ interface TradeApiItem {
   ClientCode?: string;
   ClientName?: string;
   FirmName?: string;
+  FirmId?: string;
 }
 
 function normalizeToday(today: GetAuctionsParams['today']): string {

@@ -21,7 +21,8 @@
     "pm2:monit": "pm2 monit",
     "kse:create-admin": "node scripts/create-kse-admin.js",
     "kse:create-user": "node scripts/create-kse-user.js",
-    "kse:class-registry-table": "node scripts/run-quik-class-registry-sql.js"
+    "kse:class-registry-table": "node scripts/run-quik-class-registry-sql.js",
+    "kse:firm-status-table": "node scripts/run-firm-status-sql.js"
   },
   "keywords": [],
   "author": "",

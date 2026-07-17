@@ -8,6 +8,8 @@ export interface BuyOrder {
   amount: number;
   desiredYield: number;
   account: string;
+  /** Код фирмы из QUIK.Orders.FirmId */
+  firmId: string;
   firmName: string;
   dealerName: string;
   submittedAt: string;

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Auction, BuyOrder } from '@/types/auction';
-import { buildSummaryBidsReport } from './buildSummaryBidsReport';
+import {
+  buildSummaryBidsReport,
+  formatCirculationYears,
+  resolveAnnualCouponRate,
+} from './buildSummaryBidsReport';
 
 function makeOrder(overrides: Partial<BuyOrder> = {}): BuyOrder {
   return {
@@ -11,6 +15,7 @@ function makeOrder(overrides: Partial<BuyOrder> = {}): BuyOrder {
     amount: 100_000,
     desiredYield: 10,
     account: 'A1',
+    firmId: '',
     firmName: 'Dealer',
     dealerName: 'Client',
     submittedAt: '10:00:00',
@@ -61,6 +66,8 @@ describe('buildSummaryBidsReport', () => {
 
     expect(report.securityKind).toBe('ГКВ-12 месячные');
     expect(report.circulationDays).toBe(364);
+    expect(report.circulationYears).toBe(1);
+    expect(formatCirculationYears(report.circulationYears)).toBe('1 год');
     expect(report.offerVolume).toBe(300_000_000);
     expect(report.participantCount).toBe(2);
 
@@ -87,6 +94,41 @@ describe('buildSummaryBidsReport', () => {
     expect(report.competitive.nominalValue).toBe(416_662_000);
     expect(report.competitive.actualValue).toBe(372_423_559.6);
     expect(report.competitive.percentOfTotal).toBe(100);
+  });
+
+  it('counts participant categories from firm_status lookup', () => {
+    const orders = [
+      makeOrder({ orderId: '1', firmId: 'BANK1', firmName: 'Bank' }),
+      makeOrder({ orderId: '2', firmId: 'INS1', firmName: 'Insurance' }),
+      makeOrder({ orderId: '3', firmId: 'INV1', firmName: 'Investor' }),
+      makeOrder({ orderId: '4', firmId: 'BANK1', firmName: 'Bank' }),
+    ];
+
+    const report = buildSummaryBidsReport(auction, orders, {
+      BANK1: { statusName: 'Финансовые институты', resident: true },
+      INS1: { statusName: 'страховые компании', resident: true },
+      INV1: { statusName: 'Инвесторы', resident: false },
+    });
+
+    expect(report.participantCount).toBe(3);
+    expect(report.financialInstitutions).toBe(1);
+    expect(report.institutionalInvestors).toBe(1);
+    expect(report.investors).toBe(1);
+    expect(report.residents).toBe(2);
+    expect(report.nonResidents).toBe(1);
+  });
+
+  it('computes annual coupon rate as Round(365/couponperiod)*couponvalue', () => {
+    expect(resolveAnnualCouponRate('5', '182')).toBe(10);
+    expect(resolveAnnualCouponRate('5.5', '91')).toBe(22);
+    expect(resolveAnnualCouponRate('10', '365')).toBe(10);
+    expect(resolveAnnualCouponRate('0', '182')).toBeNull();
+
+    const report = buildSummaryBidsReport(
+      { ...auction, couponvalue: '5', couponperiod: '182' },
+      [makeOrder()],
+    );
+    expect(report.couponRate).toBe(10);
   });
 
   it('does not compute weighted average when there are no competitive orders', () => {

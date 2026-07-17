@@ -26,6 +26,8 @@ export interface SummaryBidsReportData {
   auctionDate: string | null | undefined;
   securityKind: string;
   circulationDays: number | null;
+  /** Срок обращения в годах (для отображения в ведомости). */
+  circulationYears: number | null;
   registrationNumber: string;
   securitiesQuantity: number;
   offerVolume: number;
@@ -40,6 +42,12 @@ export interface SummaryBidsReportData {
   nonCompetitive: SummaryBidsVolumeBlock;
   total: SummaryBidsVolumeBlock;
   rows: SummaryBidsRow[];
+}
+
+/** Статус/резидентство фирмы из справочника firm_status (ключ — FirmId). */
+export interface FirmStatusLookup {
+  statusName: string | null;
+  resident: boolean | null;
 }
 
 function toNumber(value: string | null | undefined): number {
@@ -63,9 +71,105 @@ export function getOrderReceipts(order: BuyOrder): number {
   return round2(order.amount);
 }
 
+/**
+ * Классификация статуса фирмы для блока «Из них» сводной ведомости.
+ * Институциональные инвесторы и страховые компании объединяются в одну строку отчёта.
+ */
+export function classifyFirmStatusCategory(
+  statusName: string | null | undefined,
+): 'financial' | 'institutional' | 'investor' | null {
+  const normalized = (statusName ?? '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes('финансов')) return 'financial';
+  if (normalized.includes('институционал') || normalized.includes('страхов')) {
+    return 'institutional';
+  }
+  if (normalized.includes('инвестор')) return 'investor';
+  return null;
+}
+
+function getParticipantKey(order: BuyOrder): string {
+  const firmId = order.firmId?.trim();
+  if (firmId) return firmId;
+  const firmName = order.firmName?.trim();
+  if (firmName && firmName !== '—') return `name:${firmName}`;
+  const dealer = order.dealerName?.trim();
+  if (dealer && dealer !== '—') return `dealer:${dealer}`;
+  return '';
+}
+
+function countParticipantsByFirmStatus(
+  buyOrders: BuyOrder[],
+  firmStatuses: Record<string, FirmStatusLookup>,
+): {
+  participantCount: number;
+  financialInstitutions: number;
+  institutionalInvestors: number;
+  investors: number;
+  residents: number;
+  nonResidents: number;
+} {
+  const participants = new Map<string, { firmId: string; firmName: string }>();
+
+  for (const order of buyOrders) {
+    const key = getParticipantKey(order);
+    if (!key || participants.has(key)) continue;
+    participants.set(key, {
+      firmId: order.firmId?.trim() || '',
+      firmName: order.firmName?.trim() || '',
+    });
+  }
+
+  let financialInstitutions = 0;
+  let institutionalInvestors = 0;
+  let investors = 0;
+  let residents = 0;
+  let nonResidents = 0;
+
+  for (const participant of participants.values()) {
+    const byId = participant.firmId ? firmStatuses[participant.firmId] : undefined;
+    const status = byId ?? null;
+    const category = classifyFirmStatusCategory(status?.statusName);
+    if (category === 'financial') financialInstitutions += 1;
+    else if (category === 'institutional') institutionalInvestors += 1;
+    else if (category === 'investor') investors += 1;
+
+    if (status?.resident === true) residents += 1;
+    else if (status?.resident === false) nonResidents += 1;
+  }
+
+  return {
+    participantCount: participants.size,
+    financialInstitutions,
+    institutionalInvestors,
+    investors,
+    residents,
+    nonResidents,
+  };
+}
+
+/** Годовая купонная ставка: Округление(365 / couponperiod) * couponvalue. */
+export function resolveAnnualCouponRate(
+  couponValue: string | number | null | undefined,
+  couponPeriod: string | number | null | undefined,
+): number | null {
+  const rate = toNumber(
+    couponValue == null ? undefined : String(couponValue),
+  );
+  if (rate <= 0) return null;
+
+  const period = toNumber(
+    couponPeriod == null ? undefined : String(couponPeriod),
+  );
+  if (period <= 0) return round2(rate);
+
+  return round2(Math.round(365 / period) * rate);
+}
+
 function describeSecurity(secCode: string | undefined): {
   kind: string;
   circulationDays: number | null;
+  circulationYears: number | null;
 } {
   const code = (secCode ?? '').trim().toUpperCase();
   if (code.startsWith('GBA') && code.length >= 5) {
@@ -74,6 +178,7 @@ function describeSecurity(secCode: string | undefined): {
       return {
         kind: `ГКО-${years} ${years === 1 ? 'годичные' : 'летние'}`,
         circulationDays: years * 365,
+        circulationYears: years,
       };
     }
   }
@@ -82,13 +187,36 @@ function describeSecurity(secCode: string | undefined): {
     if (Number.isFinite(weeks) && weeks > 0) {
       const days = weeks * 7;
       const months = Math.round((weeks * 12) / 52);
+      const years = weeks / 52;
       return {
         kind: months > 0 ? `ГКВ-${months} месячные` : `ГКВ-${weeks} недельные`,
         circulationDays: days,
+        circulationYears: round2(years),
       };
     }
   }
-  return { kind: secCode?.trim() || '—', circulationDays: null };
+  return { kind: secCode?.trim() || '—', circulationDays: null, circulationYears: null };
+}
+
+/** Формат срока обращения в годах: «1 год», «2 года», «5 лет», «0,5 года». */
+export function formatCirculationYears(years: number | null | undefined): string {
+  if (years == null || !Number.isFinite(years) || years <= 0) return '—';
+
+  const rounded = Math.round(years * 100) / 100;
+  const isInteger = Number.isInteger(rounded);
+  const valueText = rounded.toLocaleString('ru-RU', {
+    minimumFractionDigits: isInteger ? 0 : 1,
+    maximumFractionDigits: 2,
+  });
+
+  if (!isInteger) return `${valueText} года`;
+
+  const n = Math.abs(Math.trunc(rounded)) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return `${valueText} лет`;
+  if (n1 === 1) return `${valueText} год`;
+  if (n1 >= 2 && n1 <= 4) return `${valueText} года`;
+  return `${valueText} лет`;
 }
 
 function buildVolumeBlock(
@@ -109,6 +237,7 @@ function buildVolumeBlock(
 export function buildSummaryBidsReport(
   auction: Auction,
   buyOrders: BuyOrder[],
+  firmStatuses: Record<string, FirmStatusLookup> = {},
 ): SummaryBidsReportData {
   const competitiveOrders = sortOrdersByYieldAsc(
     buyOrders.filter((order) => order.price > 0),
@@ -185,31 +314,28 @@ export function buildSummaryBidsReport(
     competitiveTotals.actualValue + nonCompetitiveTotals.actualValue,
   );
 
-  const participantNames = new Set(
-    buyOrders
-      .map((order) => order.firmName.trim() || order.dealerName.trim())
-      .filter((name) => name && name !== '—'),
-  );
+  const participantStats = countParticipantsByFirmStatus(buyOrders, firmStatuses);
 
   const securitiesQuantity = toNumber(auction.issuesize);
-  const { kind, circulationDays } = describeSecurity(auction.SecCode);
-  const couponRate = toNumber(auction.couponvalue);
+  const { kind, circulationDays, circulationYears } = describeSecurity(auction.SecCode);
+  const couponRate = resolveAnnualCouponRate(auction.couponvalue, auction.couponperiod);
 
   return {
     reportDate: auction.TradeDate,
     auctionDate: auction.TradeDate,
     securityKind: kind,
     circulationDays,
+    circulationYears,
     registrationNumber: auction.SecCode ?? '—',
     securitiesQuantity,
     offerVolume: securitiesQuantity * FACE_VALUE,
-    couponRate: couponRate > 0 ? couponRate : null,
-    participantCount: participantNames.size,
-    financialInstitutions: 0,
-    institutionalInvestors: 0,
-    investors: 0,
-    residents: participantNames.size,
-    nonResidents: 0,
+    couponRate,
+    participantCount: participantStats.participantCount,
+    financialInstitutions: participantStats.financialInstitutions,
+    institutionalInvestors: participantStats.institutionalInvestors,
+    investors: participantStats.investors,
+    residents: participantStats.residents,
+    nonResidents: participantStats.nonResidents,
     competitive: buildVolumeBlock(
       competitiveTotals.quantity,
       competitiveTotals.nominalValue,

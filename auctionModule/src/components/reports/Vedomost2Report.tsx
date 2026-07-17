@@ -64,6 +64,7 @@ async function loadBuyOrders(target: Auction): Promise<BuyOrder[]> {
         amount,
         desiredYield: getOrderYieldFromApi(price, yieldValue),
         account: order.TradingAccount ?? order.Account ?? '—',
+        firmId: order.FirmId?.trim() || '',
         firmName: order.FirmName?.trim() || '',
         dealerName:
           order.ClientName?.trim() ||

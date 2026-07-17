@@ -1,7 +1,12 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/auth/AuthContext';
-import { canAccessFullAuction, getUserDisplayName, isMinfinRole } from '@/types/auth';
+import {
+  canAccessDirectories,
+  canAccessFullAuction,
+  getUserDisplayName,
+  isMinfinRole,
+} from '@/types/auth';
 import styles from './Header.module.css';
 
 export function Header() {
@@ -9,7 +14,9 @@ export function Header() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const isHome = location.pathname === '/';
+  const isDirectories = location.pathname.startsWith('/directories');
   const isMinfin = isMinfinRole(user?.role);
+  const showDirectories = canAccessDirectories(user?.role);
 
   const handleLogout = () => {
     logout();
@@ -40,6 +47,14 @@ export function Header() {
             >
               {isMinfin ? 'Список ведомостей' : 'Список аукционов'}
             </Link>
+            {showDirectories && (
+              <Link
+                to="/directories"
+                className={`${styles.navLink} ${isDirectories ? styles.navLinkActive : ''}`}
+              >
+                Справочники
+              </Link>
+            )}
           </nav>
           {user && (
             <div className={styles.userBlock}>

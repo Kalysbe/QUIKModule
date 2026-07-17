@@ -65,6 +65,10 @@
   color: #1f2326;
 }
 
+.infoNestedLabel {
+  margin-top: 0.15rem;
+}
+
 .infoSubLabel {
   width: 58%;
   padding-left: 1.25rem !important;
@@ -74,6 +78,10 @@
 .infoValue {
   font-family: var(--font-mono);
   color: #1f2326;
+}
+
+.infoValueBottom {
+  vertical-align: bottom;
 }
 
 .dataTable {

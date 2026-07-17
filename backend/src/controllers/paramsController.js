@@ -5,7 +5,8 @@ import pgKsePool from "../config/dbKse.js";
 const PARAMS_TABLE_NAME = "Params";
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 200;
-const APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Almaty";
+// KSE — Бишкек (UTC+6). Asia/Almaty с 2024 = UTC+5, для КР не подходит.
+const APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Bishkek";
 const DEBUG_SQL = String(process.env.DEBUG_SQL ?? "").toLowerCase() === "true";
 
 function debugSql(label, query, params) {

@@ -9,6 +9,7 @@ import {
     getLatestPreliminaryCalculation as getLatestPreliminaryCalculationFromDb,
     getPreliminaryCalculationHistory as getPreliminaryCalculationHistoryFromDb,
 } from "../services/auctionPreliminaryCalculationsService.js";
+import { getCompletedAuctions } from "../services/completedAuctionsService.js";
 
 /* =========================
    AddAuctionSchedule - Добавление аукциона
@@ -619,6 +620,34 @@ export async function getPreliminaryCalculationHistory(req, res, next) {
             data,
         });
     } catch (err) {
+        return next(err);
+    }
+}
+
+/**
+ * GET /api/auctions/completed
+ * Публичный список завершённых аукционов (без JWT).
+ * Завершён: TradeDate + endtime уже прошли относительно текущего времени.
+ */
+export async function getCompletedAuctionsList(req, res, next) {
+    try {
+        const result = await getCompletedAuctions({
+            limit: req.query.limit !== undefined ? Number(req.query.limit) : undefined,
+            offset: req.query.offset !== undefined ? Number(req.query.offset) : undefined,
+        });
+
+        return res.json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({
+                success: false,
+                message: err.message,
+            });
+        }
         return next(err);
     }
 }

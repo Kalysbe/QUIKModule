@@ -138,6 +138,82 @@ const router = express.Router();
  *       500:
  *         description: Ошибка сервера
  */
+/**
+ * @swagger
+ * /api/auctions/completed:
+ *   get:
+ *     summary: Публичный список завершённых аукционов
+ *     tags: [QUIK - Auctions]
+ *     description: |
+ *       Без авторизации. Аукцион считается завершённым, если дата аукциона (TradeDate)
+ *       и время окончания (endtime) уже прошли относительно текущего момента (APP_TIMEZONE).
+ *
+ *       Поля ответа:
+ *       - date — дата dd/mm/yyyy
+ *       - secCode — код бумаги
+ *       - issueVolume — объём выпуска (issuesize)
+ *       - demandVolume — объём спроса по заявкам (сумма Qty)
+ *       - dealVolume — объём сделки (сумма Qty по уникальным TradeNum)
+ *       - minYield / maxYield / avgYield — мин./макс./средневзе. доходность по сделкам
+ *       - couponRate — купонная ставка как в Ведомости 1:
+ *         Округление(365 / couponperiod) * couponvalue
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 500
+ *           minimum: 1
+ *           maximum: 2000
+ *       - in: query
+ *         name: offset
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *     responses:
+ *       200:
+ *         description: Список завершённых аукционов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date: { type: string, example: "17/07/2026" }
+ *                       secCode: { type: string, example: "GBA0526" }
+ *                       issueVolume: { type: number }
+ *                       demandVolume: { type: number }
+ *                       dealVolume: { type: number }
+ *                       minYield: { type: number, nullable: true }
+ *                       maxYield: { type: number, nullable: true }
+ *                       avgYield: { type: number, nullable: true }
+ *                       couponRate: { type: number, nullable: true }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     limit: { type: integer }
+ *                     offset: { type: integer }
+ *                     count: { type: integer }
+ *                     total: { type: integer }
+ *       400:
+ *         description: Некорректные limit/offset
+ *       404:
+ *         description: Таблица Params или обязательные столбцы не найдены
+ *       500:
+ *         description: Ошибка сервера
+ */
+router.get("/completed", a.getCompletedAuctionsList);
+
 router.post("/", a.addAuctionSchedule);
 router.put("/", a.editAuctionSchedule);
 router.delete("/", a.deleteAuctionSchedule);

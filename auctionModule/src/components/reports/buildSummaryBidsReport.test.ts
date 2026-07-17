@@ -174,4 +174,45 @@ describe('buildSummaryBidsReport', () => {
     expect(nonCompetitive?.cumulativeNominalValue).toBe(50_000);
     expect(nonCompetitive?.price).toBeNull();
   });
+
+  it('collapses rows with same price into one cumulative row', () => {
+    const orders = [
+      makeOrder({
+        orderId: '1',
+        price: 86.3,
+        quantity: 11_580,
+        amount: 1_158_000,
+        desiredYield: 13,
+      }),
+      makeOrder({
+        orderId: '2',
+        price: 86.3,
+        quantity: 6_000_000,
+        amount: 600_000_000,
+        desiredYield: 13,
+      }),
+      makeOrder({
+        orderId: '3',
+        price: 82.51,
+        quantity: 400_000,
+        amount: 40_000_000,
+        desiredYield: 15.5,
+      }),
+    ];
+
+    const report = buildSummaryBidsReport(auction, orders);
+    expect(report.rows).toHaveLength(2);
+    expect(report.rows[0]).toMatchObject({
+      price: 86.3,
+      cumulativeNominalValue: 601_158_000,
+      cumulativeReceipts: 518_799_354,
+      yieldByPrice: 13,
+    });
+    expect(report.rows[1]).toMatchObject({
+      price: 82.51,
+      cumulativeNominalValue: 641_158_000,
+      cumulativeReceipts: 551_803_354,
+      yieldByPrice: 15.5,
+    });
+  });
 });

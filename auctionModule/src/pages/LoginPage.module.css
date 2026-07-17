@@ -55,6 +55,14 @@
   font-size: 0.85rem;
 }
 
+.notice {
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: #ecfdf3;
+  color: #027a48;
+  font-size: 0.85rem;
+}
+
 .submit {
   width: 100%;
 }

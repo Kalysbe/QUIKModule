@@ -1,6 +1,6 @@
 import express from "express";
-import { login, getMe } from "../controllers/kseAuthController.js";
-import { kseRequireAuth } from "../middleware/kseAuth.js";
+import { login, getMe, changePassword } from "../controllers/kseAuthController.js";
+import { kseRequireAuth, kseRequireAdmin } from "../middleware/kseAuth.js";
 
 const router = express.Router();
 
@@ -67,5 +67,39 @@ router.use(kseRequireAuth);
  *         description: Требуется авторизация
  */
 router.get("/auth/me", getMe);
+
+/**
+ * @swagger
+ * /api/kse/auth/change-password:
+ *   post:
+ *     summary: Смена пароля (admin)
+ *     tags: [KSE - Auth]
+ *     description: Администратор меняет свой пароль. Требуется текущий пароль.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 format: password
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Пароль изменён
+ *       400:
+ *         description: Ошибка валидации
+ *       401:
+ *         description: Неверный текущий пароль
+ *       403:
+ *         description: Требуется роль admin
+ */
+router.post("/auth/change-password", kseRequireAdmin, changePassword);
 
 export default router;

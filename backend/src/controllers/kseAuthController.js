@@ -1,10 +1,18 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import logger from "../utils/logger.js";
-import { findByLogin, findById, updateLastActivity } from "../repositories/kseUsersRepository.js";
+import {
+  findByLogin,
+  findById,
+  findByIdWithPassword,
+  updateLastActivity,
+  updateUser
+} from "../repositories/kseUsersRepository.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "default-secret-change-me";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
+const BCRYPT_ROUNDS = 10;
+const MIN_PASSWORD_LENGTH = 8;
 
 /**
  * POST /api/kse/auth/login
@@ -110,6 +118,91 @@ export async function getMe(req, res, next) {
     };
     res.json({ user: userResponse });
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/kse/auth/change-password
+ * Требует JWT и роль admin. Тело: { currentPassword, newPassword }
+ */
+export async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Укажите текущий и новый пароль",
+        error: "VALIDATION_ERROR"
+      });
+    }
+
+    if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        message: `Новый пароль должен содержать не менее ${MIN_PASSWORD_LENGTH} символов`,
+        error: "VALIDATION_ERROR"
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Новый пароль должен отличаться от текущего",
+        error: "VALIDATION_ERROR"
+      });
+    }
+
+    const user = await findByIdWithPassword(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Пользователь не найден",
+        error: "NOT_FOUND"
+      });
+    }
+
+    const passwordHash = user.password_hash;
+    if (!passwordHash || typeof passwordHash !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Смена пароля недоступна для этой учётной записи",
+        error: "VALIDATION_ERROR"
+      });
+    }
+
+    let match = false;
+    try {
+      match = await bcrypt.compare(currentPassword, passwordHash);
+    } catch (bcryptErr) {
+      logger.warn("bcrypt.compare failed on change-password", {
+        message: bcryptErr.message,
+        userId: user.id
+      });
+      return res.status(401).json({
+        success: false,
+        message: "Неверный текущий пароль",
+        error: "UNAUTHORIZED"
+      });
+    }
+
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        message: "Неверный текущий пароль",
+        error: "UNAUTHORIZED"
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await updateUser(user.id, { password_hash: newPasswordHash });
+
+    res.json({
+      success: true,
+      message: "Пароль успешно изменён"
+    });
+  } catch (err) {
+    logger.error("Change password error", { message: err.message, stack: err.stack, name: err.name });
     next(err);
   }
 }

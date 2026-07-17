@@ -18,6 +18,10 @@ export default function LoginPage() {
     (location.state as { from?: string } | null)?.from ??
     (user && isMinfinRole(user.role) ? '/' : '/');
 
+  const passwordChanged = Boolean(
+    (location.state as { passwordChanged?: boolean } | null)?.passwordChanged,
+  );
+
   if (user) {
     return <Navigate to={redirectTo} replace />;
   }
@@ -61,6 +65,10 @@ export default function LoginPage() {
             autoComplete="current-password"
             required
           />
+
+          {passwordChanged && (
+            <div className={styles.notice}>Пароль изменён. Войдите с новым паролем.</div>
+          )}
 
           {error && <div className={styles.error}>{error}</div>}
 

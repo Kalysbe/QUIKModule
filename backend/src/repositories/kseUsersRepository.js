@@ -30,6 +30,19 @@ export async function findById(id) {
 }
 
 /**
+ * Найти пользователя по id (с password_hash, для проверки текущего пароля).
+ */
+export async function findByIdWithPassword(id) {
+  const result = await pgKsePool.query(
+    `SELECT id, login, first_name, last_name, firm_code, role, password_hash, last_activity_at, created_at, updated_at
+     FROM ${TABLE}
+     WHERE id = $1`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+/**
  * Найти пользователя по логину (для входа).
  * @param {string} login
  * @returns {Promise<{ id, login, first_name, last_name, firm_code, role, password_hash, last_activity_at, created_at, updated_at } | null>}

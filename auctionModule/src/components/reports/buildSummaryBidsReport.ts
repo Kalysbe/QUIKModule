@@ -234,6 +234,32 @@ function buildVolumeBlock(
   };
 }
 
+/**
+ * Для одинаковой цены в сводной таблице оставляем одну строку:
+ * берём последнюю (максимально накопленную) запись по этой цене.
+ */
+function collapseCompetitiveRowsByPrice(rows: SummaryBidsRow[]): SummaryBidsRow[] {
+  if (rows.length <= 1) return rows;
+
+  const collapsed: SummaryBidsRow[] = [];
+  for (const row of rows) {
+    const prev = collapsed[collapsed.length - 1];
+    if (
+      prev &&
+      prev.type === 'competitive' &&
+      row.type === 'competitive' &&
+      prev.price != null &&
+      row.price != null &&
+      prev.price === row.price
+    ) {
+      collapsed[collapsed.length - 1] = row;
+      continue;
+    }
+    collapsed.push(row);
+  }
+  return collapsed;
+}
+
 export function buildSummaryBidsReport(
   auction: Auction,
   buyOrders: BuyOrder[],
@@ -319,6 +345,7 @@ export function buildSummaryBidsReport(
   const securitiesQuantity = toNumber(auction.issuesize);
   const { kind, circulationDays, circulationYears } = describeSecurity(auction.SecCode);
   const couponRate = resolveAnnualCouponRate(auction.couponvalue, auction.couponperiod);
+  const collapsedCompetitiveRows = collapseCompetitiveRowsByPrice(competitiveRows);
 
   return {
     reportDate: auction.TradeDate,
@@ -354,6 +381,6 @@ export function buildSummaryBidsReport(
       totalActual,
       totalNominal,
     ),
-    rows: [...nonCompetitiveRows, ...competitiveRows],
+    rows: [...nonCompetitiveRows, ...collapsedCompetitiveRows],
   };
 }

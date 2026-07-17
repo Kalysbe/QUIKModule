@@ -22,6 +22,7 @@ import {
   filterOrdersByCutOffPrice,
   formatVolume,
   mapOrdersToStatementRows,
+  NON_COMPETITIVE_SHARE,
   round4,
   sortOrdersByYieldAsc,
   summarizeAllocationRows,
@@ -52,6 +53,7 @@ export default function AuctionDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const isMinfinUser = isMinfinRole(user?.role);
+  const isAdminUser = user?.role === 'admin';
   const activeTab = isMinfinUser ? 'reports' : parseDetailTab(searchParams.get('tab'));
   const setActiveTab = useCallback(
     (tab: DetailTab) => {
@@ -173,6 +175,23 @@ export default function AuctionDetailPage() {
   const totalOrders = competitiveTotals.quantity + nonCompetitiveTotals.quantity;
   const totalAmount = competitiveTotals.amount + nonCompetitiveTotals.amount;
 
+  const tradeTotals = useMemo(() => {
+    const seenTradeIds = new Set<string>();
+    return trades.reduce(
+      (acc, trade) => {
+        // У сделки две стороны с одним TradeNum — учитываем объём один раз.
+        if (trade.tradeId) {
+          if (seenTradeIds.has(trade.tradeId)) return acc;
+          seenTradeIds.add(trade.tradeId);
+        }
+        acc.quantity += trade.quantity;
+        acc.amount += trade.amount;
+        return acc;
+      },
+      { quantity: 0, amount: 0 },
+    );
+  }, [trades]);
+
   const offeredQty = useMemo(() => {
     const parsed = Number.parseFloat(offeredQtyInput.replace(',', '.'));
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
@@ -190,11 +209,11 @@ export default function AuctionDetailPage() {
   );
 
   const allocationRows = useMemo(
-    () => calculateAllocation(activeBuyOrders, offeredQty),
+    () => calculateAllocation(activeBuyOrders, offeredQty, NON_COMPETITIVE_SHARE),
     [activeBuyOrders, offeredQty],
   );
   const preliminaryAllocationRows = useMemo(
-    () => calculateAllocation(preliminaryBuyOrders, offeredQty),
+    () => calculateAllocation(preliminaryBuyOrders, offeredQty, NON_COMPETITIVE_SHARE),
     [preliminaryBuyOrders, offeredQty],
   );
   const allocationRequested = preliminaryAllocationRows.reduce(
@@ -334,13 +353,11 @@ export default function AuctionDetailPage() {
 
     const loadSaved = async () => {
       try {
-        const [latest, history] = await Promise.all([
-          getLatestPreliminaryCalculation(auctionId),
-          getPreliminaryCalculationHistory(auctionId),
-        ]);
+        const history = await getPreliminaryCalculationHistory(auctionId);
         if (cancelled) return;
 
         setCalculationHistory(history);
+        const latest = history[0] ?? null;
         if (latest) {
           setSavedCalculation(latest);
           setOfferedQtyInput(String(latest.offeredQty));
@@ -349,9 +366,20 @@ export default function AuctionDetailPage() {
           }
         }
       } catch {
-        if (!cancelled) {
-          setSavedCalculation(null);
-          setCalculationHistory([]);
+        if (cancelled) return;
+        try {
+          const latest = await getLatestPreliminaryCalculation(auctionId);
+          if (cancelled) return;
+          if (latest) {
+            setSavedCalculation(latest);
+            setCalculationHistory([latest]);
+            setOfferedQtyInput(String(latest.offeredQty));
+            if (latest.cutOffPrice != null && latest.cutOffPrice > 0) {
+              setCutOffPriceInput(String(latest.cutOffPrice));
+            }
+          }
+        } catch {
+          // Не очищаем уже показанные данные при сетевой ошибке повторной загрузки
         }
       }
     };
@@ -525,7 +553,12 @@ export default function AuctionDetailPage() {
         </div>
         <section className={styles.tabsSection}>
           <div className={styles.content}>
-            <ReportsPanel auction={auction} buyOrders={reportBuyOrders} trades={trades} />
+            <ReportsPanel
+              auction={auction}
+              buyOrders={reportBuyOrders}
+              trades={trades}
+              isMinfin
+            />
           </div>
         </section>
       </div>
@@ -962,7 +995,7 @@ export default function AuctionDetailPage() {
               </div>
             </div>
 
-            {calculationHistory.length > 1 && (
+            {calculationHistory.length > 0 && (
               <div className={styles.historyPanel}>
                 <div className={styles.historyTitle}>История расчётов</div>
                 <div className={styles.historyList}>
@@ -1183,7 +1216,13 @@ export default function AuctionDetailPage() {
 
         {activeTab === 'reports' && (
           <div className={styles.content}>
-            <ReportsPanel auction={auction} buyOrders={reportBuyOrders} trades={trades} />
+            <ReportsPanel
+              auction={auction}
+              buyOrders={reportBuyOrders}
+              trades={trades}
+              isMinfin={isMinfinUser}
+              isAdmin={isAdminUser}
+            />
           </div>
         )}
         {activeTab === 'trades' && (
@@ -1205,19 +1244,36 @@ export default function AuctionDetailPage() {
                 </thead>
                 <tbody>
                   {trades.length > 0 ? (
-                    trades.map((trade, index) => (
-                      <tr key={trade.tradeId || `${trade.instrument}-${index}`}>
-                        <td>{trade.tradeId || '—'}</td>
-                        <td>{trade.instrument}</td>
-                        <td className={styles.mono}>{trade.price.toFixed(4)}</td>
-                        <td className={styles.mono}>{trade.quantity.toLocaleString('ru-RU')}</td>
-                        <td className={styles.mono}>{trade.amount.toLocaleString('ru-RU')}</td>
-                        <td className={styles.mono}>{trade.yieldValue.toFixed(4)}</td>
-                        <td>{trade.dealerName || trade.firmName || '—'}</td>
-                        <td>{trade.account}</td>
-                        <td>{trade.tradedAt}</td>
+                    <>
+                      {trades.map((trade, index) => (
+                        <tr key={trade.tradeId || `${trade.instrument}-${index}`}>
+                          <td>{trade.tradeId || '—'}</td>
+                          <td>{trade.instrument}</td>
+                          <td className={styles.mono}>{trade.price.toFixed(4)}</td>
+                          <td className={styles.mono}>{trade.quantity.toLocaleString('ru-RU')}</td>
+                          <td className={styles.mono}>{trade.amount.toLocaleString('ru-RU')}</td>
+                          <td className={styles.mono}>{trade.yieldValue.toFixed(4)}</td>
+                          <td>{trade.dealerName || trade.firmName || '—'}</td>
+                          <td>{trade.account}</td>
+                          <td>{trade.tradedAt}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td>Итого:</td>
+                        <td />
+                        <td />
+                        <td className={styles.mono}>
+                          {tradeTotals.quantity.toLocaleString('ru-RU')}
+                        </td>
+                        <td className={styles.mono}>
+                          {tradeTotals.amount.toLocaleString('ru-RU')}
+                        </td>
+                        <td />
+                        <td />
+                        <td />
+                        <td />
                       </tr>
-                    ))
+                    </>
                   ) : (
                     <tr>
                       <td colSpan={9} className={styles.emptyRow}>

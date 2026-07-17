@@ -148,6 +148,7 @@ router.get("/orders", a.getAuctionOrders);
 router.post("/allocate", a.allocateAuction);
 router.post("/allocate/tri", a.downloadAllocationTri);
 router.post("/preliminary-calculations", auctionRequireAuth, auctionDenyMinfinWrite, a.savePreliminaryCalculation);
+router.get("/preliminary-calculations/history", auctionRequireAuth, auctionRequireReadRole, a.getPreliminaryCalculationHistory);
 router.get("/preliminary-calculations", auctionRequireAuth, auctionRequireReadRole, a.getLatestPreliminaryCalculation);
 
 export default router;

@@ -91,9 +91,10 @@ export function computePriceYieldStats(
 
   const minPriceFinal = pickPositive(minPrice, params.low, params.bid);
   const maxPriceFinal = pickPositive(maxPrice, params.high, params.offer);
+  // Приоритет — средневзвешенная цена по заявкам, Params.waprice — запасной источник.
   const avgPrice = pickPositive(
-    params.waprice,
     avgPriceFromOrders,
+    params.waprice,
     params.last,
     minPriceFinal,
     maxPriceFinal,

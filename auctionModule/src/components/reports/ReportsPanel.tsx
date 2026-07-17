@@ -1,20 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Auction, BuyOrder, Trade } from '@/types/auction';
+import { isAuctionActive } from '@/utils/auctionStatus';
 import { CentralDepositoryReport } from './CentralDepositoryReport';
 import { OrderClassificationReport } from './OrderClassificationReport';
 import { SummaryBidsReport } from './SummaryBidsReport';
 import { Vedomost2Report } from './Vedomost2Report';
-import { REPORT_OPTIONS, type ReportId } from './types';
+import { getAvailableReportOptions, type ReportId } from './types';
 import styles from './ReportsPanel.module.css';
 
 interface ReportsPanelProps {
   auction: Auction;
   buyOrders: BuyOrder[];
   trades?: Trade[];
+  isMinfin?: boolean;
+  isAdmin?: boolean;
 }
 
-export function ReportsPanel({ auction, buyOrders, trades = [] }: ReportsPanelProps) {
-  const [activeReportId, setActiveReportId] = useState<ReportId>('orderClassification');
+export function ReportsPanel({
+  auction,
+  buyOrders,
+  trades = [],
+  isMinfin = false,
+  isAdmin = false,
+}: ReportsPanelProps) {
+  const auctionCompleted = !isAuctionActive(auction);
+  const classificationAvailable = auctionCompleted || isAdmin;
+  const availableOptions = useMemo(
+    () => getAvailableReportOptions({ isMinfin, isAdmin, auctionCompleted }),
+    [isMinfin, isAdmin, auctionCompleted],
+  );
+
+  const [activeReportId, setActiveReportId] = useState<ReportId>(
+    () => availableOptions[0]?.id ?? 'summaryBids',
+  );
+
+  useEffect(() => {
+    if (availableOptions.some((option) => option.id === activeReportId)) return;
+    const fallback = availableOptions[0]?.id;
+    if (fallback) setActiveReportId(fallback);
+  }, [availableOptions, activeReportId]);
 
   return (
     <div className={styles.panel}>
@@ -28,7 +52,7 @@ export function ReportsPanel({ auction, buyOrders, trades = [] }: ReportsPanelPr
           value={activeReportId}
           onChange={(event) => setActiveReportId(event.target.value as ReportId)}
         >
-          {REPORT_OPTIONS.map((option) => (
+          {availableOptions.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
             </option>
@@ -39,9 +63,12 @@ export function ReportsPanel({ auction, buyOrders, trades = [] }: ReportsPanelPr
       <p className={styles.hint}>
         Отчет формируется только по текущему аукциону{' '}
         {auction.SecCode ? `(${auction.SecCode})` : ''}.
+        {!classificationAvailable && (
+          <> Классификация заявок станет доступна после завершения аукциона.</>
+        )}
       </p>
 
-      {activeReportId === 'orderClassification' && (
+      {activeReportId === 'orderClassification' && classificationAvailable && (
         <OrderClassificationReport auction={auction} buyOrders={buyOrders} />
       )}
       {activeReportId === 'summaryBids' && (
@@ -50,7 +77,7 @@ export function ReportsPanel({ auction, buyOrders, trades = [] }: ReportsPanelPr
       {activeReportId === 'vedomost2' && (
         <Vedomost2Report auction={auction} buyOrders={buyOrders} trades={trades} />
       )}
-      {activeReportId === 'centralDepository' && (
+      {activeReportId === 'centralDepository' && !isMinfin && (
         <CentralDepositoryReport auction={auction} buyOrders={buyOrders} />
       )}
     </div>

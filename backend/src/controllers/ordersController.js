@@ -53,6 +53,7 @@ const TRADE_TABLE_NAME = "Trades";
 
 const TRADE_COLUMN_CANDIDATES = {
   TradeNum: ["TradeNum", "tradenum", "trade_num"],
+  OrderNum: ["OrderNum", "ordernum", "order_num"],
   ClassCode: ["ClassCode", "classcode", "class_code"],
   SecCode: ["SecCode", "seccode", "sec_code"],
   Price: ["Price", "price"],
@@ -81,6 +82,7 @@ const TRADE_COLUMN_CANDIDATES = {
 
 const TRADE_OUTPUT_COLUMNS = [
   "TradeNum",
+  "OrderNum",
   "ClassCode",
   "SecCode",
   "Price",

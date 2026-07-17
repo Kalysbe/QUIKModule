@@ -72,4 +72,26 @@ describe('computePriceYieldStats', () => {
     expect(stats.demandAmount).toBe(1000);
     expect(stats.demandQuantity).toBe(10);
   });
+
+  it('prefers weighted average from orders over params.waprice', () => {
+    const stats = computePriceYieldStats(
+      [
+        makeOrder({
+          orderId: '1',
+          price: 90,
+          quantity: 100,
+          amount: 9000,
+        }),
+        makeOrder({
+          orderId: '2',
+          price: 95,
+          quantity: 300,
+          amount: 28500,
+        }),
+      ],
+      { waprice: 80 },
+    );
+
+    expect(stats.avgPrice).toBeCloseTo((90 * 100 + 95 * 300) / 400, 2);
+  });
 });

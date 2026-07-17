@@ -160,21 +160,15 @@ export function allocateProRata(
   return base;
 }
 
-export function calculateAllocation(orders: BuyOrder[], offeredQty: number): AllocationRow[] {
-  if (offeredQty <= 0 || orders.length === 0) return [];
+/** Доля объёма продажи (N), резервируемая под неконкурентные заявки. */
+export const NON_COMPETITIVE_SHARE = 0.3;
 
-  const competitive = orders
-    .filter((order) => order.price > 0 && getOrderQuantity(order) > 0)
-    .sort((a, b) => {
-      if (b.price !== a.price) return b.price - a.price;
-      return a.orderId.localeCompare(b.orderId);
-    });
-  const nonCompetitive = orders.filter(
-    (order) => order.price === 0 && getOrderQuantity(order) > 0,
-  );
-
-  const result = new Map<string, AllocationRow>();
-  let remaining = toWholeBonds(offeredQty);
+function allocateCompetitiveVolume(
+  competitive: BuyOrder[],
+  volume: number,
+  result: Map<string, AllocationRow>,
+): number {
+  let remaining = toWholeBonds(volume);
   let index = 0;
 
   while (index < competitive.length && remaining > 0) {
@@ -223,30 +217,101 @@ export function calculateAllocation(orders: BuyOrder[], offeredQty: number): All
     }
   }
 
-  if (remaining > 0 && nonCompetitive.length > 0) {
-    const nonCompRequested = nonCompetitive.reduce(
-      (sum, order) => sum + toWholeBonds(getOrderQuantity(order)),
-      0,
+  return remaining;
+}
+
+function allocateNonCompetitiveVolume(
+  nonCompetitive: BuyOrder[],
+  volume: number,
+  result: Map<string, AllocationRow>,
+): number {
+  if (nonCompetitive.length === 0 || volume <= 0) return toWholeBonds(volume);
+
+  const remainingRequests = nonCompetitive.map((order) => {
+    const requested = toWholeBonds(getOrderQuantity(order));
+    const already = result.get(order.orderId)?.allocated ?? 0;
+    return Math.max(0, requested - already);
+  });
+  const unmetDemand = remainingRequests.reduce((sum, value) => sum + value, 0);
+  if (unmetDemand <= 0) return toWholeBonds(volume);
+
+  const amount = Math.min(toWholeBonds(volume), unmetDemand);
+  const shares = allocateProRata(remainingRequests, amount, 'lastDeal');
+
+  nonCompetitive.forEach((order, idx) => {
+    const allocated = toWholeBonds(shares[idx]);
+    if (allocated <= 0 && result.has(order.orderId)) return;
+
+    const requested = toWholeBonds(getOrderQuantity(order));
+    const existing = result.get(order.orderId);
+    const totalAllocated = (existing?.allocated ?? 0) + allocated;
+    result.set(
+      order.orderId,
+      buildAllocationRow(order, {
+        requested,
+        allocated: totalAllocated,
+        type: 'nonCompetitive',
+        price: 0,
+      }),
     );
-    const amount = Math.min(remaining, nonCompRequested);
-    const shares = allocateProRata(
-      nonCompetitive.map((order) => toWholeBonds(getOrderQuantity(order))),
-      amount,
-      'lastDeal',
-    );
-    nonCompetitive.forEach((order, idx) => {
-      const allocated = toWholeBonds(shares[idx]);
-      const requested = toWholeBonds(getOrderQuantity(order));
-      result.set(
-        order.orderId,
-        buildAllocationRow(order, {
-          requested,
-          allocated,
-          type: 'nonCompetitive',
-          price: 0,
-        }),
-      );
+  });
+
+  return toWholeBonds(volume) - amount;
+}
+
+/**
+ * Распределение объёма продажи N:
+ * — неконкурентные получают строго NON_COMPETITIVE_SHARE (30%) от N
+ *   (не больше своего спроса; недобор возвращается конкурентным);
+ * — конкурентные получают оставшиеся 70% (+ недобор неконкурентных),
+ *   по цене убыванию с пропорциональным делением на маржинальном уровне.
+ */
+export function calculateAllocation(
+  orders: BuyOrder[],
+  offeredQty: number,
+  nonCompetitiveShare: number = NON_COMPETITIVE_SHARE,
+): AllocationRow[] {
+  if (offeredQty <= 0 || orders.length === 0) return [];
+
+  const competitive = orders
+    .filter((order) => order.price > 0 && getOrderQuantity(order) > 0)
+    .sort((a, b) => {
+      if (b.price !== a.price) return b.price - a.price;
+      return a.orderId.localeCompare(b.orderId);
     });
+  const nonCompetitive = orders.filter(
+    (order) => order.price === 0 && getOrderQuantity(order) > 0,
+  );
+
+  const result = new Map<string, AllocationRow>();
+  const total = toWholeBonds(offeredQty);
+  const share =
+    Number.isFinite(nonCompetitiveShare) && nonCompetitiveShare > 0
+      ? Math.min(1, nonCompetitiveShare)
+      : 0;
+
+  // Резерв 30% N под неконкурентные (если такие заявки есть).
+  let nonCompQuota =
+    nonCompetitive.length > 0 ? toWholeBonds(total * share) : 0;
+  const unusedNonCompQuota = allocateNonCompetitiveVolume(
+    nonCompetitive,
+    nonCompQuota,
+    result,
+  );
+  nonCompQuota -= unusedNonCompQuota;
+
+  // Конкурентные получают остаток: 70% N + недоиспользованный резерв неконкурентных.
+  const competitiveVolume = total - nonCompQuota;
+  const unusedCompetitive = allocateCompetitiveVolume(
+    competitive,
+    competitiveVolume,
+    result,
+  );
+
+  // Если конкурентные не выбрали весь свой объём — отдаём остаток неконкурентным
+  // (сверх квоты), чтобы не оставлять N нераспределённым при наличии спроса.
+  if (unusedCompetitive > 0 && nonCompetitive.length > 0) {
+    allocateNonCompetitiveVolume(nonCompetitive, unusedCompetitive, result);
   }
 
   orders.forEach((order) => {
@@ -297,16 +362,48 @@ export function buildTriOrdersContent(params: {
   secCode: string;
   rows: AllocationRow[];
   startTransId?: number;
+  /** Средневзвешенная цена продажи — подставляется в неконкурентные заявки. */
+  weightedAveragePrice?: number;
 }): string {
   const startId = params.startTransId ?? 1;
   const { tradingAccount, clientCode } = resolveTradingAccountEntry(params.classCode);
+
+  const waFromCompetitive = (() => {
+    let weightSum = 0;
+    let valueSum = 0;
+    for (const row of params.rows) {
+      if (row.type !== 'competitive') continue;
+      const qty = toWholeBonds(row.allocated);
+      if (qty <= 0 || !(row.price > 0)) continue;
+      weightSum += qty;
+      valueSum += qty * row.price;
+    }
+    return weightSum > 0 ? round4(valueSum / weightSum) : 0;
+  })();
+
+  const waPrice =
+    params.weightedAveragePrice != null &&
+    Number.isFinite(params.weightedAveragePrice) &&
+    params.weightedAveragePrice > 0
+      ? round4(params.weightedAveragePrice)
+      : waFromCompetitive;
 
   return params.rows
     .filter((row) => toWholeBonds(row.allocated) > 0)
     .map((row, idx) => {
       const transId = startId + idx;
-      const price = Number.isFinite(row.price) ? row.price : 0;
+      const isNonCompetitive = row.type === 'nonCompetitive';
+      const rawPrice =
+        isNonCompetitive && waPrice > 0
+          ? waPrice
+          : Number.isFinite(row.price)
+            ? row.price
+            : 0;
+      const price = Number.isFinite(rawPrice) ? rawPrice : 0;
       const qty = toWholeBonds(row.allocated);
+      // Для неконкурентных QUIK ожидает объём = количество × средневзвешенная цена.
+      const volume =
+        isNonCompetitive && price > 0 ? round4(qty * price) : 0;
 
       const fields: Array<[string, string | number]> = [
         ['TRANS_ID', transId],
@@ -318,7 +415,7 @@ export function buildTriOrdersContent(params: {
         ['К/П', 'Продажа'],
         ['Цена', price.toFixed(2)],
         ['Количество', qty],
-        ['Объем', '0.00'],
+        ['Объем', volume.toFixed(2)],
         ['Комментарий', clientCode],
         ['Тип', price > 0 ? 'Лимитированная' : 'Рыночная'],
         ['Условие исполнения', 'Поставить в очередь'],

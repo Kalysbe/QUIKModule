@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getAuctions } from '@/api/auctions';
+import { getAuctions, getOrdersByAuctionDates } from '@/api/auctions';
 import type { Auction } from '@/types/auction';
 import { isAuctionActive } from '@/utils/auctionStatus';
+import {
+  collectAuctionDateParams,
+  enrichAuctionsWithOrderWaPrice,
+} from '@/utils/enrichAuctionsWaPrice';
 
 interface UseAuctionsResult {
   auctions: Auction[];
@@ -9,6 +13,24 @@ interface UseAuctionsResult {
   error: string | null;
   lastUpdatedAt: Date | null;
   refresh: () => void;
+}
+
+async function loadAuctionsWithWaPrice(todayOnly: boolean): Promise<Auction[]> {
+  const response = await getAuctions({
+    limit: 200,
+    offset: 0,
+    today: todayOnly,
+  });
+  const auctions = response.data ?? [];
+  if (auctions.length === 0) return auctions;
+
+  try {
+    const orders = await getOrdersByAuctionDates(collectAuctionDateParams(auctions));
+    return enrichAuctionsWithOrderWaPrice(auctions, orders);
+  } catch {
+    // Список аукционов важнее: при ошибке заявок оставляем исходный waprice
+    return auctions;
+  }
 }
 
 export function useAuctions(todayOnly: boolean): UseAuctionsResult {
@@ -22,12 +44,8 @@ export function useAuctions(todayOnly: boolean): UseAuctionsResult {
     if (showLoader) setLoading(true);
     setError(null);
     try {
-      const response = await getAuctions({
-        limit: 200,
-        offset: 0,
-        today: todayOnly,
-      });
-      setAuctions(response.data ?? []);
+      const next = await loadAuctionsWithWaPrice(todayOnly);
+      setAuctions(next);
       setLastUpdatedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка загрузки');
@@ -43,13 +61,9 @@ export function useAuctions(todayOnly: boolean): UseAuctionsResult {
       setLoading(true);
       setError(null);
       try {
-        const response = await getAuctions({
-          limit: 200,
-          offset: 0,
-          today: todayOnly,
-        });
+        const next = await loadAuctionsWithWaPrice(todayOnly);
         if (!cancelled) {
-          setAuctions(response.data ?? []);
+          setAuctions(next);
           setLastUpdatedAt(new Date());
         }
       } catch (err) {

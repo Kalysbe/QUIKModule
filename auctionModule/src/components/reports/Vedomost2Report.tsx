@@ -94,7 +94,8 @@ async function loadTrades(target: Auction): Promise<Trade[]> {
     const yieldValue = toNumber(trade.Yield);
     const amount = toNumber(trade.Value);
     return {
-      tradeId: trade.TradeNum ?? '',
+      tradeId: trade.TradeNum != null ? String(trade.TradeNum) : '',
+      orderNum: trade.OrderNum != null ? String(trade.OrderNum) : '',
       instrument: trade.SecCode ?? target.SecCode ?? '—',
       price,
       quantity: resolveOrderQuantity(toNumber(trade.Qty), amount, price),
@@ -239,7 +240,7 @@ export function Vedomost2Report({ auction, buyOrders, trades = [] }: Vedomost2Re
 
   const handleDownloadCsv = () => {
     const rows: Array<Array<string | number>> = [
-      ['Ведомость 2'],
+      ['Сводная ведомость 2'],
       ['Дата', formatShortDate(report.reportDate)],
       [],
       [
@@ -298,7 +299,7 @@ export function Vedomost2Report({ auction, buyOrders, trades = [] }: Vedomost2Re
     <div className={`${styles.report} report-print-root`}>
       <div className={styles.printArea}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Ведомость 2</h2>
+          <h2 className={styles.title}>Сводная ведомость 2</h2>
           <div className={styles.reportDate}>
             Дата: {formatShortDate(report.reportDate)}
           </div>

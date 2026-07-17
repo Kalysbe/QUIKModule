@@ -34,6 +34,7 @@ interface OrderApiItem {
 
 interface TradeApiItem {
   TradeNum?: string;
+  OrderNum?: string;
   ClassCode?: string;
   SecCode?: string;
   Price?: string;
@@ -129,6 +130,30 @@ export async function getOrdersByInstrument(
   return rows.filter((order) =>
     matchesAuctionDate(order.OrderDateTime, auctionDate),
   );
+}
+
+/** Заявки по датам аукционов (YYYYMMDD) — для расчёта средневзв. цены в списке. */
+export async function getOrdersByAuctionDates(
+  auctionDates: string[],
+): Promise<OrderApiItem[]> {
+  const uniqueDates = [...new Set(auctionDates.filter(Boolean))];
+  if (uniqueDates.length === 0) {
+    const { data } = await apiClient.get<OrderApiItem[]>('/orders/all', {
+      params: { today: '1' },
+    });
+    return Array.isArray(data) ? data : [];
+  }
+
+  const batches = await Promise.all(
+    uniqueDates.map(async (AuctionDate) => {
+      const { data } = await apiClient.get<OrderApiItem[]>('/orders/all', {
+        params: { AuctionDate },
+      });
+      return Array.isArray(data) ? data : [];
+    }),
+  );
+
+  return batches.flat();
 }
 
 export async function getTradesByInstrument(

@@ -35,7 +35,7 @@ npm run preview
 | Файл | Переменная | Значение |
 |------|------------|----------|
 | `.env.development` | `VITE_API_URL` | `/api` |
-| `.env.production` | `VITE_API_URL` | `http://192.168.20.96:5000/api` |
+| `.env.production` | `VITE_API_URL` | `/api` (same-origin через nginx; для Docker задаётся и в Dockerfile) |
 
 ## API
 

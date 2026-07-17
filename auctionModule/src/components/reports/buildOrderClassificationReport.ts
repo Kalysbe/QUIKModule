@@ -1,4 +1,5 @@
 import type { Auction, BuyOrder } from '@/types/auction';
+import { NON_COMPETITIVE_SHARE } from '@/utils/allocation';
 
 export interface OrderClassificationRow {
   dealerName: string;
@@ -30,6 +31,10 @@ function toNumber(value: string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function buildOrderClassificationReport(
   auction: Auction,
   buyOrders: BuyOrder[],
@@ -59,10 +64,9 @@ export function buildOrderClassificationReport(
     yieldPercent: getOrderYield(order),
   }));
 
-  const nonCompetitiveAmount = buyOrders.reduce((sum, order) => {
-    if (order.price === 0) return sum + order.amount;
-    return sum;
-  }, 0);
+  const issueVolume = toNumber(auction.issuesize);
+  // Лимит неконкурентных — строго 30% от объёма выпуска.
+  const nonCompetitiveAmount = round2(issueVolume * NON_COMPETITIVE_SHARE);
 
   const totalNominalValue = rows.reduce((sum, row) => sum + row.nominalValue, 0);
 
@@ -70,7 +74,7 @@ export function buildOrderClassificationReport(
     auctionId: auction.auction_id ?? auction.SecCode ?? '',
     registrationNumber: auction.SecCode ?? '—',
     auctionDate: auction.TradeDate,
-    issueVolume: toNumber(auction.issuesize),
+    issueVolume,
     nonCompetitiveAmount,
     reportDate: auction.TradeDate,
     rows,

@@ -18,6 +18,8 @@ export interface BuyOrder {
 
 export interface Trade {
   tradeId: string;
+  /** Номер заявки из Trades.OrderNum — связь с Orders для типа заявки. */
+  orderNum: string;
   instrument: string;
   price: number;
   quantity: number;

@@ -7,6 +7,7 @@ import { queryAuctionOrders, getOrdersColumnMap, formatYyyymmdd } from "../servi
 import {
     savePreliminaryCalculation as savePreliminaryCalculationToDb,
     getLatestPreliminaryCalculation as getLatestPreliminaryCalculationFromDb,
+    getPreliminaryCalculationHistory as getPreliminaryCalculationHistoryFromDb,
 } from "../services/auctionPreliminaryCalculationsService.js";
 
 /* =========================
@@ -545,6 +546,7 @@ const SavePreliminaryCalculationSchema = z.object({
     secCode: z.string().max(12),
     tradeDate: z.string().nullable().optional(),
     offeredQty: z.number(),
+    cutOffPrice: z.number().positive().optional(),
     requestedQty: z.number(),
     distributedQty: z.number(),
     coveragePct: z.number(),
@@ -588,6 +590,29 @@ export async function getLatestPreliminaryCalculation(req, res, next) {
         }
 
         const data = await getLatestPreliminaryCalculationFromDb(auctionId);
+
+        return res.json({
+            success: true,
+            data,
+        });
+    } catch (err) {
+        return next(err);
+    }
+}
+
+export async function getPreliminaryCalculationHistory(req, res, next) {
+    try {
+        const auctionId = String(req.query.auction_id ?? req.query.auctionId ?? "").trim();
+        if (!auctionId) {
+            return res.status(400).json({
+                success: false,
+                message: "Параметр auction_id обязателен",
+            });
+        }
+
+        const limitRaw = Number(req.query.limit);
+        const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+        const data = await getPreliminaryCalculationHistoryFromDb(auctionId, limit);
 
         return res.json({
             success: true,

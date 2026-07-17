@@ -11,8 +11,8 @@ import type { TradingAccountEntry } from './tradingAccountEntry.types';
 
 /** Значение по умолчанию — используется, если для ClassCode нет записи в справочнике. */
 export const DEFAULT_TRADING_ACCOUNT_ENTRY: TradingAccountEntry = {
-  tradingAccount: '1-3301-38',
-  clientCode: 'minfinown',
+  tradingAccount: '1-3301-22',
+  clientCode: 'Minfin',
 };
 
 /**
@@ -20,5 +20,5 @@ export const DEFAULT_TRADING_ACCOUNT_ENTRY: TradingAccountEntry = {
  * Ключи храним в верхнем регистре, сравнение по ClassCode регистронезависимое.
  */
 export const TRADING_ACCOUNTS_DIRECTORY: Record<string, TradingAccountEntry> = {
-  // Пример: 'GKO': { tradingAccount: '1-3301-38', clientCode: '2001' },
+  // Пример: 'GKO': { tradingAccount: '1-3301-68', clientCode: '2001' },
 };

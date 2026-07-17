@@ -25,13 +25,25 @@ describe('App', () => {
       expect(response.status).not.toBe(403);
     });
 
-    test('should reject external IP', async () => {
-      const response = await request(app)
-        .get('/api/orders/all')
-        .set('X-Forwarded-For', '8.8.8.8');
-      
-      expect(response.status).toBe(403);
-      expect(response.body).toHaveProperty('error', 'FORBIDDEN_IP');
+    test('should reject external IP when TRUST_PROXY is off', async () => {
+      const prevTrust = process.env.TRUST_PROXY;
+      const prevDocker = process.env.RUNNING_IN_DOCKER;
+      process.env.TRUST_PROXY = 'false';
+      delete process.env.RUNNING_IN_DOCKER;
+
+      try {
+        const response = await request(app)
+          .get('/api/orders/all')
+          .set('X-Forwarded-For', '8.8.8.8');
+
+        expect(response.status).toBe(403);
+        expect(response.body).toHaveProperty('error', 'FORBIDDEN_IP');
+      } finally {
+        if (prevTrust === undefined) delete process.env.TRUST_PROXY;
+        else process.env.TRUST_PROXY = prevTrust;
+        if (prevDocker === undefined) delete process.env.RUNNING_IN_DOCKER;
+        else process.env.RUNNING_IN_DOCKER = prevDocker;
+      }
     });
   });
 

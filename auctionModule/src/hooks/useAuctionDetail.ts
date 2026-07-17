@@ -110,7 +110,8 @@ async function loadTrades(auction: Auction): Promise<Trade[]> {
     const yieldValue = toNumber(trade.Yield);
     const amount = toNumber(trade.Value);
     return {
-      tradeId: trade.TradeNum ?? '',
+      tradeId: trade.TradeNum != null ? String(trade.TradeNum) : '',
+      orderNum: trade.OrderNum != null ? String(trade.OrderNum) : '',
       instrument: trade.SecCode ?? auction.SecCode ?? '—',
       price,
       quantity: resolveOrderQuantity(toNumber(trade.Qty), amount, price),

@@ -243,20 +243,16 @@ export function computeAuctionComparisonMetrics(
     const price = row.price > 0 ? row.price : order?.price ?? 0;
     const yieldPercent =
       row.yield > 0 ? row.yield : order ? getOrderYield(order) : 0;
-    const nominal =
-      row.type === 'nonCompetitive'
-        ? order?.amount ?? row.allocated * FACE_VALUE
-        : row.allocated * FACE_VALUE;
+    // И количество, и номинал — от распределённых бумаг (как в предварительных расчётах).
+    const quantity = row.allocated;
+    const nominal = quantity * FACE_VALUE;
     const actual =
-      row.type === 'nonCompetitive'
-        ? nominal
-        : price > 0
-          ? round2((nominal * price) / 100)
-          : 0;
+      row.type === 'competitive' && price > 0
+        ? round2((nominal * price) / FACE_VALUE)
+        : 0;
     const target = row.type === 'competitive' ? competitive : nonCompetitive;
 
-    target.quantity +=
-      row.type === 'nonCompetitive' ? round2(nominal / FACE_VALUE) : row.allocated;
+    target.quantity += quantity;
     target.nominalValue += nominal;
     target.actualValue = round2(target.actualValue + actual);
 
@@ -278,11 +274,10 @@ export function computeAuctionComparisonMetrics(
 
   const waPrice = competitive.weightedAveragePrice;
   if (nonCompetitive.quantity > 0 && waPrice != null && waPrice > 0) {
-    // Для неконкурентных: по факту = сумма заявки, по номиналу = сумма / WA * 100.
-    nonCompetitive.nominalValue = round2(
-      (nonCompetitive.actualValue * FACE_VALUE) / waPrice,
+    // Неконкурентные исполняются по средневзвешенной цене конкурентных.
+    nonCompetitive.actualValue = round2(
+      (nonCompetitive.nominalValue * waPrice) / FACE_VALUE,
     );
-    nonCompetitive.quantity = round2(nonCompetitive.nominalValue / FACE_VALUE);
   }
 
   const total: PlacementBlock = {
@@ -345,6 +340,21 @@ function resolveTradeQuantity(trade: Trade): number {
   return 0;
 }
 
+/**
+ * Тип сделки по заявке Orders: неконкурентная, если у связанной заявки Price = 0.
+ * После исполнения в Trades у всех сделок уже есть цена/доходность.
+ */
+function resolveTradePlacementType(
+  trade: Trade,
+  orderByNum: Map<string, BuyOrder>,
+): 'competitive' | 'nonCompetitive' | null {
+  const orderNum = trade.orderNum?.trim();
+  if (!orderNum) return null;
+  const order = orderByNum.get(orderNum);
+  if (!order) return null;
+  return order.price === 0 ? 'nonCompetitive' : 'competitive';
+}
+
 function finalizePlacementMetrics(
   auction: Auction,
   preliminary: PreliminaryCalculation | null,
@@ -365,10 +375,13 @@ function finalizePlacementMetrics(
 
   const waPrice = competitive.weightedAveragePrice;
   if (nonCompetitive.quantity > 0 && waPrice != null && waPrice > 0) {
-    nonCompetitive.nominalValue = round2(
-      (nonCompetitive.actualValue * FACE_VALUE) / waPrice,
+    if (nonCompetitive.nominalValue <= 0) {
+      nonCompetitive.nominalValue = round2(nonCompetitive.quantity * FACE_VALUE);
+    }
+    // Количество/номинал уже от распределённых бумаг; по факту — по WA.
+    nonCompetitive.actualValue = round2(
+      (nonCompetitive.nominalValue * waPrice) / FACE_VALUE,
     );
-    nonCompetitive.quantity = round2(nonCompetitive.nominalValue / FACE_VALUE);
   }
 
   const total: PlacementBlock = {
@@ -417,6 +430,12 @@ export function computeAuctionComparisonMetricsFromTrades(
     0,
   );
 
+  const orderByNum = new Map<string, BuyOrder>();
+  for (const order of buyOrders) {
+    const key = order.orderId?.trim();
+    if (key) orderByNum.set(key, order);
+  }
+
   const competitive = emptyPlacementBlock();
   const nonCompetitive = emptyPlacementBlock();
   const competitiveWeights: Array<{ weight: number; price: number; yield: number }> =
@@ -427,10 +446,13 @@ export function computeAuctionComparisonMetricsFromTrades(
   let yieldAtMaxPrice: number | null = null;
 
   for (const trade of trades) {
+    // Берём только сторону покупателя: OrderNum есть в Orders.
+    const type = resolveTradePlacementType(trade, orderByNum);
+    if (!type) continue;
+
     const allocated = resolveTradeQuantity(trade);
     if (allocated <= 0 && trade.amount <= 0) continue;
 
-    const type = trade.price > 0 ? 'competitive' : 'nonCompetitive';
     const price = trade.price;
     const yieldPercent = resolveTradeYield(trade);
 
@@ -441,32 +463,28 @@ export function computeAuctionComparisonMetricsFromTrades(
       }
     }
 
-    const nominal =
-      type === 'nonCompetitive'
-        ? trade.amount > 0
-          ? trade.amount
-          : allocated * FACE_VALUE
-        : allocated * FACE_VALUE;
+    const quantity =
+      allocated > 0
+        ? allocated
+        : type === 'nonCompetitive' && trade.amount > 0
+          ? toWholeBonds(trade.amount / FACE_VALUE)
+          : 0;
+    if (quantity <= 0) continue;
+
+    const nominal = quantity * FACE_VALUE;
     const actual =
-      type === 'nonCompetitive'
-        ? trade.amount > 0
-          ? trade.amount
-          : nominal
-        : price > 0
-          ? round2((nominal * price) / 100)
-          : trade.amount > 0
-            ? trade.amount
-            : 0;
+      type === 'competitive' && price > 0
+        ? round2((nominal * price) / FACE_VALUE)
+        : 0;
     const target = type === 'competitive' ? competitive : nonCompetitive;
 
-    target.quantity +=
-      type === 'nonCompetitive' ? round2(nominal / FACE_VALUE) : allocated;
+    target.quantity += quantity;
     target.nominalValue += nominal;
     target.actualValue = round2(target.actualValue + actual);
 
-    if (type === 'competitive' && price > 0 && allocated > 0) {
+    if (type === 'competitive' && price > 0 && quantity > 0) {
       competitiveWeights.push({
-        weight: allocated,
+        weight: quantity,
         price,
         yield: yieldPercent,
       });
@@ -498,7 +516,16 @@ export function computeVedomost2Metrics(
   } = {},
 ): AuctionComparisonMetrics {
   if (trades.length > 0) {
-    return computeAuctionComparisonMetricsFromTrades(auction, trades, buyOrders, options);
+    const fromTrades = computeAuctionComparisonMetricsFromTrades(
+      auction,
+      trades,
+      buyOrders,
+      options,
+    );
+    // Нет связки OrderNum→Orders — не подменяем пустым размещением.
+    if (fromTrades.total.quantity > 0 || fromTrades.total.nominalValue > 0) {
+      return fromTrades;
+    }
   }
   return computeAuctionComparisonMetrics(auction, buyOrders, options);
 }

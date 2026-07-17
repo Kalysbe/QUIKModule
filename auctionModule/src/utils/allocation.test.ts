@@ -113,6 +113,47 @@ describe('calculateAllocation', () => {
     expect(byId.get('7157')?.allocated).toBe(1000);
     expect(byId.get('7157')?.type).toBe('nonCompetitive');
   });
+
+  it('reserves 30% of offered volume for non-competitive orders', () => {
+    const orders = [
+      makeOrder({ orderId: '7194', price: 93.39, quantity: 2720, amount: 254_020.8 }),
+      makeOrder({ orderId: '7196', price: 92.52, quantity: 10_170, amount: 940_928.4 }),
+      makeOrder({ orderId: '7195', price: 92.52, quantity: 10_170, amount: 940_928.4 }),
+      makeOrder({ orderId: '7197', price: 0, quantity: 0, amount: 416_900 }),
+    ];
+
+    const rows = calculateAllocation(orders, 12_000);
+    const byId = new Map(rows.map((row) => [row.orderId, row]));
+
+    expect(byId.get('7197')?.requested).toBe(4169);
+    expect(byId.get('7197')?.allocated).toBe(3600);
+    expect(byId.get('7194')?.allocated).toBe(2720);
+
+    const competitiveAllocated = rows
+      .filter((row) => row.type === 'competitive')
+      .reduce((sum, row) => sum + row.allocated, 0);
+    const nonCompetitiveAllocated = rows
+      .filter((row) => row.type === 'nonCompetitive')
+      .reduce((sum, row) => sum + row.allocated, 0);
+
+    expect(nonCompetitiveAllocated).toBe(3600);
+    expect(competitiveAllocated).toBe(8400);
+    expect(competitiveAllocated + nonCompetitiveAllocated).toBe(12_000);
+  });
+
+  it('returns unused non-competitive quota to competitive orders', () => {
+    const orders = [
+      makeOrder({ orderId: '1', price: 95, quantity: 10_000, amount: 950_000 }),
+      makeOrder({ orderId: '2', price: 0, quantity: 0, amount: 50_000 }),
+    ];
+
+    const rows = calculateAllocation(orders, 10_000);
+    const byId = new Map(rows.map((row) => [row.orderId, row]));
+
+    // 30% of 10000 = 3000, but non-comp demand is only 500 → unused 2500 to competitive
+    expect(byId.get('2')?.allocated).toBe(500);
+    expect(byId.get('1')?.allocated).toBe(9500);
+  });
 });
 
 describe('sortOrdersByYieldAsc', () => {
@@ -152,6 +193,62 @@ describe('buildTriOrdersContent', () => {
     expect(content).toContain('Цена=95.50');
     expect(content).toContain('Количество=10');
     expect(content).toContain('Номер встречной заявки=1001');
+    expect(content).toContain('Торговый счет=1-3301-68');
     expect(toWholeBonds(10.9)).toBe(10);
+  });
+
+  it('puts weighted-average price into non-competitive rows', () => {
+    const content = buildTriOrdersContent({
+      classCode: 'AUCT_GD',
+      secCode: 'GD052270712',
+      rows: [
+        {
+          orderId: '7194',
+          price: 93.39,
+          yield: 7,
+          requested: 2720,
+          allocated: 2720,
+          requestedValue: 254020.8,
+          allocatedValue: 254020.8,
+          fulfillmentRate: 100,
+          type: 'competitive',
+        },
+        {
+          orderId: '7196',
+          price: 92.52,
+          yield: 8,
+          requested: 5000,
+          allocated: 5680,
+          requestedValue: 462600,
+          allocatedValue: 525513.6,
+          fulfillmentRate: 100,
+          type: 'competitive',
+        },
+        {
+          orderId: '7197',
+          price: 0,
+          yield: 0,
+          requested: 4169,
+          allocated: 3600,
+          requestedValue: 416900,
+          allocatedValue: 360021.59,
+          fulfillmentRate: 86.35,
+          type: 'nonCompetitive',
+        },
+      ],
+    });
+
+    const lines = content.split('\r\n');
+    const nonCompLine = lines.find((line) => line.includes('Номер встречной заявки=7197'));
+    expect(nonCompLine).toBeTruthy();
+    expect(nonCompLine).toContain('Цена=92.80');
+    expect(nonCompLine).toContain('Количество=3600');
+    // Объём = количество × средневзвешенная цена
+    expect(nonCompLine).toContain('Объем=334086.12');
+    expect(nonCompLine).toContain('Тип=Лимитированная');
+    expect(nonCompLine).toContain('Торговый счет=1-3301-68');
+
+    const competitiveLine = lines.find((line) => line.includes('Номер встречной заявки=7194'));
+    expect(competitiveLine).toContain('Объем=0.00');
   });
 });

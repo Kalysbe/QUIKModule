@@ -13,6 +13,7 @@ import {
   isCancelledOrderState,
   isReportableOrderState,
 } from '@/utils/orderState';
+import { isWithdrawnAtAuctionEnd } from '@/utils/orderWithdraw';
 import { playNewOrderSound } from '@/utils/notificationSound';
 
 interface UseAuctionDetailResult {
@@ -65,7 +66,14 @@ async function loadBuyOrders(auction: Auction): Promise<BuyOrder[]> {
     .filter((order) => {
       const operation = (order.Operation ?? '').toLowerCase();
       if (!operation.includes('куп')) return false;
-      return !isCancelledOrderState(order.State);
+      if (!isCancelledOrderState(order.State)) return true;
+      // «Снята» — только если снята в момент окончания аукциона (для классификации).
+      return isWithdrawnAtAuctionEnd(
+        order.State,
+        order.WithdrawDateTime,
+        auction.TradeDate,
+        auction.endtime,
+      );
     })
     .map((order) => {
       const price = toNumber(order.Price);
@@ -92,7 +100,9 @@ async function loadBuyOrders(auction: Auction): Promise<BuyOrder[]> {
           '—',
         submittedAt: formatOrderDateTime(order.OrderDateTime),
         state,
+        withdrawDateTime: order.WithdrawDateTime ?? null,
         isActive: isActiveOrderState(order.State),
+        // Снятые на окончании — не в общих ведомостях/таблице, только в классификации.
         isReportable: isReportableOrderState(order.State),
       };
     });

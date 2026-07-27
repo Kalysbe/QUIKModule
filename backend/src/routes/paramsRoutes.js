@@ -17,7 +17,7 @@ const router = express.Router();
  *   get:
  *     summary: Получить параметры только по аукционным классам
  *     tags: [QUIK - Params]
- *     description: Возвращает данные из таблицы Params (PostgreSQL) только для тех записей, где ClassCode присутствует в локальном реестре quik_kse и помечен как trade segment = auction, и поле auction_id не пустое (IS NOT NULL).
+ *     description: Возвращает данные из таблицы Params (PostgreSQL) только для тех записей, где ClassCode присутствует в trade_class_rules с market_type = primary (первичка), и поле auction_id не пустое (IS NOT NULL).
  *     parameters:
  *       - in: query
  *         name: limit

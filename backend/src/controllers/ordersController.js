@@ -12,6 +12,14 @@ const COLUMN_CANDIDATES = {
   Value: ["Value", "value", "Amount", "amount"],
   Yield: ["Yield", "yield", "DesiredYield", "desired_yield"],
   OrderDateTime: ["OrderDateTime", "orderdatetime", "order_date_time", "OrderDate", "orderdate", "order_date"],
+  WithdrawDateTime: [
+    "WithdrawDateTime",
+    "withdrawdatetime",
+    "withdraw_date_time",
+    "WithdrawTime",
+    "withdrawtime",
+    "withdraw_time",
+  ],
   Operation: ["Operation", "operation"],
   State: ["State", "state", "Status", "status"],
   ClientCode: ["ClientCode", "clientcode", "client_code", "BrokerClientCode", "brokerclientcode", "broker_client_code"],
@@ -43,6 +51,7 @@ const OUTPUT_COLUMNS = [
   "Value",
   "Yield",
   "OrderDateTime",
+  "WithdrawDateTime",
   "Operation",
   "State",
   "ClientCode",
@@ -50,6 +59,9 @@ const OUTPUT_COLUMNS = [
   "FirmName",
   "FirmId",
 ];
+
+/** timestamp without time zone — отдаём «стеновое» время без сдвига TZ. */
+const WALL_CLOCK_TIMESTAMP_COLUMNS = new Set(["WithdrawDateTime"]);
 const ACTIVE_STATE = "Активна";
 const TRADE_TABLE_NAME = "Trades";
 
@@ -174,7 +186,12 @@ async function queryOrders({ req, onlyActive }) {
   }
 
   const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const selectParts = Object.entries(colMap).map(([out, real]) => `"${real}" AS "${out}"`);
+  const selectParts = Object.entries(colMap).map(([out, real]) => {
+    if (WALL_CLOCK_TIMESTAMP_COLUMNS.has(out)) {
+      return `to_char("${real}", 'YYYY-MM-DD"T"HH24:MI:SS') AS "${out}"`;
+    }
+    return `"${real}" AS "${out}"`;
+  });
   const orderBy = colMap.OrderDateTime
     ? `"${colMap.OrderDateTime}" DESC NULLS LAST`
     : colMap.OrderNum

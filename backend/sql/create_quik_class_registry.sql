@@ -1,5 +1,6 @@
--- Локальные категории классов QUIK (БД quik_kse)
--- Выполнить: psql ... -d quik_kse -f sql/create_quik_class_registry.sql
+-- Локальные категории классов QUIK (БД QuikExport, POSTGRES_*)
+-- Выполнить: psql ... -d QuikExport -f sql/create_quik_class_registry.sql
+-- Или: node scripts/run-quik-class-registry-sql.js
 
 CREATE TABLE IF NOT EXISTS public.quik_class_categories (
   id       SERIAL PRIMARY KEY,

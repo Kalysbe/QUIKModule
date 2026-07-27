@@ -70,3 +70,43 @@ export async function updateFirmDirectory(
   );
   return data.data;
 }
+
+export type ClassMarketType = 'primary' | 'secondary';
+
+export interface ClassRegistryItem {
+  class_code: string;
+  class_name: string | null;
+  class_type: number | null;
+  trade_date?: string | null;
+  market_type: ClassMarketType | null;
+  rule_id: number | null;
+}
+
+export async function getClassRegistry(params?: {
+  search?: string;
+  market_type?: ClassMarketType | 'unset' | null;
+}): Promise<ClassRegistryItem[]> {
+  const query: Record<string, string> = {};
+  if (params?.search) query.search = params.search;
+  if (params?.market_type) query.market_type = params.market_type;
+
+  const { data } = await apiClient.get<{
+    success: boolean;
+    data: ClassRegistryItem[];
+    total: number;
+  }>('/kse/directories/class-registry', {
+    params: Object.keys(query).length ? query : undefined,
+  });
+  return data.data ?? [];
+}
+
+export async function updateClassMarketType(
+  classCode: string,
+  marketType: ClassMarketType | null,
+): Promise<ClassRegistryItem> {
+  const { data } = await apiClient.put<{ success: boolean; data: ClassRegistryItem }>(
+    `/kse/directories/class-registry/${encodeURIComponent(classCode)}`,
+    { market_type: marketType },
+  );
+  return data.data;
+}

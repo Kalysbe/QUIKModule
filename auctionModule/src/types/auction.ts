@@ -14,6 +14,8 @@ export interface BuyOrder {
   dealerName: string;
   submittedAt: string;
   state: string;
+  /** Время снятия заявки (Orders.WithdrawDateTime), wall-clock. */
+  withdrawDateTime?: string | null;
   isActive: boolean;
   isReportable: boolean;
 }

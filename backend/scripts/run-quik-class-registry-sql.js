@@ -1,5 +1,5 @@
 /**
- * Выполняет sql/create_quik_class_registry.sql против БД KSE из .env (без psql).
+ * Выполняет sql/create_quik_class_registry.sql против БД QuikExport (POSTGRES_*) из .env.
  * Запуск: node scripts/run-quik-class-registry-sql.js
  */
 import fs from "fs";
@@ -26,11 +26,11 @@ async function main() {
   const stmts = splitStatements(sql);
 
   const client = new pg.Client({
-    host: process.env.KSE_DB_HOST,
-    port: Number(process.env.KSE_DB_PORT || 5432),
-    user: process.env.KSE_DB_USER,
-    password: process.env.KSE_DB_PASSWORD,
-    database: process.env.KSE_DB_NAME,
+    host: process.env.POSTGRES_HOST,
+    port: Number(process.env.POSTGRES_PORT || 5432),
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    database: process.env.POSTGRES_DB,
   });
 
   await client.connect();
@@ -39,7 +39,7 @@ async function main() {
       const q = `${stmts[i]};`;
       await client.query(q);
     }
-    console.log(`OK: выполнено ${stmts.length} операторов из ${path.basename(sqlPath)}`);
+    console.log(`OK: выполнено ${stmts.length} операторов из ${path.basename(sqlPath)} → ${process.env.POSTGRES_DB}`);
   } finally {
     await client.end();
   }

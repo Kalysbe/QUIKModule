@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Auction, BuyOrder } from '@/types/auction';
-import { buildOrderClassificationReport } from './buildOrderClassificationReport';
+import {
+  buildOrderClassificationReport,
+  isIncludedInOrderClassification,
+} from './buildOrderClassificationReport';
 
 function makeOrder(partial: Partial<BuyOrder> & Pick<BuyOrder, 'orderId'>): BuyOrder {
   return {
@@ -67,5 +70,51 @@ describe('buildOrderClassificationReport', () => {
     expect(report.rows[0].nominalValue).toBe(517_800_000);
     expect(report.rows[1].nominalValue).toBe(999_354);
     expect(report.totalNominalValue).toBe(518_799_354);
+  });
+
+  it('includes «Снята» only when WithdrawDateTime matches auction end', () => {
+    const auction: Auction = {
+      SecCode: 'GBA02280720',
+      TradeDate: '2026-07-17',
+      endtime: '17:00:00',
+      issuesize: '1000',
+    };
+
+    const atEnd = makeOrder({
+      orderId: '1',
+      state: 'Снята',
+      isActive: false,
+      isReportable: false,
+      withdrawDateTime: '2026-07-17T17:00:00',
+      price: 90,
+      quantity: 10,
+      firmName: 'AtEnd',
+    });
+    const early = makeOrder({
+      orderId: '2',
+      state: 'Снята',
+      isActive: false,
+      isReportable: false,
+      withdrawDateTime: '2026-07-17T10:00:00',
+      price: 91,
+      quantity: 20,
+      firmName: 'Early',
+    });
+    const active = makeOrder({
+      orderId: '3',
+      price: 92,
+      quantity: 5,
+      firmName: 'Active',
+    });
+
+    expect(isIncludedInOrderClassification(atEnd, auction)).toBe(true);
+    expect(isIncludedInOrderClassification(early, auction)).toBe(false);
+    expect(isIncludedInOrderClassification(active, auction)).toBe(true);
+
+    const report = buildOrderClassificationReport(auction, [atEnd, early, active]);
+    expect(report.rows.map((r) => r.dealerName).sort()).toEqual(
+      ['Active', 'AtEnd'].sort(),
+    );
+    expect(report.totalNominalValue).toBe(1_500);
   });
 });

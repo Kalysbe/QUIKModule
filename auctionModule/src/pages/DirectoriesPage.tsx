@@ -3,10 +3,14 @@ import { Navigate } from 'react-router-dom';
 import {
   createFirmStatusDict,
   deleteFirmStatusDict,
+  getClassRegistry,
   getFirmStatusDict,
   getFirmsDirectory,
+  updateClassMarketType,
   updateFirmDirectory,
   updateFirmStatusDict,
+  type ClassMarketType,
+  type ClassRegistryItem,
   type FirmDirectoryItem,
   type FirmStatusDictItem,
 } from '@/api/directories';
@@ -19,7 +23,7 @@ import { Select } from '@/components/ui/Select';
 import { canAccessDirectories } from '@/types/auth';
 import styles from './DirectoriesPage.module.css';
 
-type TabId = 'firms' | 'statuses';
+type TabId = 'firms' | 'statuses' | 'classes';
 
 function getErrorMessage(err: unknown): string {
   if (err && typeof err === 'object' && 'response' in err) {
@@ -30,6 +34,19 @@ function getErrorMessage(err: unknown): string {
   return 'Не удалось загрузить справочники';
 }
 
+const MARKET_TYPE_OPTIONS = [
+  { value: '', label: '— не задан —' },
+  { value: 'primary', label: 'Первичка' },
+  { value: 'secondary', label: 'Вторичка' },
+];
+
+const MARKET_FILTER_OPTIONS = [
+  { value: '', label: 'Все' },
+  { value: 'primary', label: 'Первичка' },
+  { value: 'secondary', label: 'Вторичка' },
+  { value: 'unset', label: 'Не задан' },
+];
+
 export default function DirectoriesPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<TabId>('firms');
@@ -37,45 +54,90 @@ export default function DirectoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [firms, setFirms] = useState<FirmDirectoryItem[]>([]);
   const [statuses, setStatuses] = useState<FirmStatusDictItem[]>([]);
+  const [classes, setClasses] = useState<ClassRegistryItem[]>([]);
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [classSearch, setClassSearch] = useState('');
+  const [draftClassSearch, setDraftClassSearch] = useState('');
+  const [classMarketFilter, setClassMarketFilter] = useState('');
   const [savingFirmId, setSavingFirmId] = useState<string | null>(null);
+  const [savingClassCode, setSavingClassCode] = useState<string | null>(null);
   const [newStatusName, setNewStatusName] = useState('');
   const [editingStatusId, setEditingStatusId] = useState<number | null>(null);
   const [editingStatusName, setEditingStatusName] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadAll = useCallback(async (searchValue = search) => {
+  const loadFirmsAndStatuses = useCallback(async (searchValue = search) => {
+    const [firmsData, statusData] = await Promise.all([
+      getFirmsDirectory(searchValue),
+      getFirmStatusDict(),
+    ]);
+    setFirms(firmsData);
+    setStatuses(statusData);
+  }, [search]);
+
+  const loadClasses = useCallback(async (
+    searchValue = classSearch,
+    marketFilter = classMarketFilter,
+  ) => {
+    const classesData = await getClassRegistry({
+      search: searchValue,
+      market_type: (marketFilter || null) as ClassMarketType | 'unset' | null,
+    });
+    setClasses(classesData);
+  }, [classSearch, classMarketFilter]);
+
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [firmsData, statusData] = await Promise.all([
-        getFirmsDirectory(searchValue),
-        getFirmStatusDict(),
+      await Promise.all([
+        loadFirmsAndStatuses(search),
+        loadClasses(classSearch, classMarketFilter),
       ]);
-      setFirms(firmsData);
-      setStatuses(statusData);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [loadFirmsAndStatuses, loadClasses, search, classSearch, classMarketFilter]);
 
   useEffect(() => {
-    void loadAll('');
+    void loadAll();
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (draftSearch !== search) {
         setSearch(draftSearch);
-        void loadAll(draftSearch);
+        void (async () => {
+          try {
+            await loadFirmsAndStatuses(draftSearch);
+          } catch (err) {
+            setNotice(getErrorMessage(err));
+          }
+        })();
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [draftSearch, search, loadAll]);
+  }, [draftSearch, search, loadFirmsAndStatuses]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (draftClassSearch !== classSearch) {
+        setClassSearch(draftClassSearch);
+        void (async () => {
+          try {
+            await loadClasses(draftClassSearch, classMarketFilter);
+          } catch (err) {
+            setNotice(getErrorMessage(err));
+          }
+        })();
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [draftClassSearch, classSearch, classMarketFilter, loadClasses]);
 
   const statusOptions = useMemo(
     () => [
@@ -182,16 +244,59 @@ export default function DirectoriesPage() {
     }
   };
 
+  const handleClassMarketChange = async (
+    item: ClassRegistryItem,
+    marketType: ClassMarketType | null,
+  ) => {
+    setSavingClassCode(item.class_code);
+    setNotice(null);
+    try {
+      const updated = await updateClassMarketType(item.class_code, marketType);
+      setClasses((prev) =>
+        prev.map((row) =>
+          row.class_code === item.class_code
+            ? {
+                ...row,
+                market_type: updated.market_type,
+                rule_id: updated.rule_id,
+                class_name: updated.class_name ?? row.class_name,
+              }
+            : row,
+        ),
+      );
+      const label =
+        marketType === 'primary'
+          ? 'Первичка'
+          : marketType === 'secondary'
+            ? 'Вторичка'
+            : 'не задан';
+      setNotice(`${item.class_code}: ${label}`);
+    } catch (err) {
+      setNotice(getErrorMessage(err));
+    } finally {
+      setSavingClassCode(null);
+    }
+  };
+
+  const handleMarketFilterChange = async (value: string) => {
+    setClassMarketFilter(value);
+    try {
+      await loadClasses(classSearch, value);
+    } catch (err) {
+      setNotice(getErrorMessage(err));
+    }
+  };
+
   if (!canAccessDirectories(user?.role)) {
     return <Navigate to="/" replace />;
   }
 
-  if (loading && firms.length === 0 && statuses.length === 0) {
+  if (loading && firms.length === 0 && statuses.length === 0 && classes.length === 0) {
     return <PageLoader label="Загрузка справочников…" />;
   }
 
-  if (error && firms.length === 0) {
-    return <ErrorState message={error} onRetry={() => void loadAll(search)} />;
+  if (error && firms.length === 0 && classes.length === 0) {
+    return <ErrorState message={error} onRetry={() => void loadAll()} />;
   }
 
   return (
@@ -199,7 +304,8 @@ export default function DirectoriesPage() {
       <div className={styles.hero}>
         <h1 className={styles.title}>Справочники</h1>
         <p className={styles.subtitle}>
-          Статусы и резидентство фирм. Список фирм загружается из QUIK (таблица Firms).
+          Фирмы, статусы и классы QUIK. Для классов укажите первичный или вторичный рынок —
+          классы с типом «Первичка» попадают в список аукционов.
         </p>
       </div>
 
@@ -218,6 +324,13 @@ export default function DirectoriesPage() {
         >
           Статусы
         </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${tab === 'classes' ? styles.tabActive : ''}`}
+          onClick={() => setTab('classes')}
+        >
+          Классы
+        </button>
       </div>
 
       {notice && <div className={styles.notice}>{notice}</div>}
@@ -231,7 +344,7 @@ export default function DirectoriesPage() {
               value={draftSearch}
               onChange={(e) => setDraftSearch(e.target.value)}
             />
-            <Button variant="secondary" size="sm" onClick={() => void loadAll(search)}>
+            <Button variant="secondary" size="sm" onClick={() => void loadFirmsAndStatuses(search)}>
               Обновить
             </Button>
           </div>
@@ -398,6 +511,76 @@ export default function DirectoriesPage() {
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       Справочник пуст
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {tab === 'classes' && (
+        <section className={styles.section}>
+          <div className={styles.toolbar}>
+            <Input
+              label="Поиск"
+              placeholder="ClassCode или название…"
+              value={draftClassSearch}
+              onChange={(e) => setDraftClassSearch(e.target.value)}
+            />
+            <Select
+              label="Рынок"
+              options={MARKET_FILTER_OPTIONS}
+              value={classMarketFilter}
+              onChange={(e) => void handleMarketFilterChange(e.target.value)}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void loadClasses(classSearch, classMarketFilter)}
+            >
+              Обновить
+            </Button>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>ClassCode</th>
+                  <th>Название</th>
+                  <th>Тип QUIK</th>
+                  <th>Рынок</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classes.map((item) => (
+                  <tr key={item.class_code}>
+                    <td className={styles.mono}>{item.class_code}</td>
+                    <td>{item.class_name ?? '—'}</td>
+                    <td>{item.class_type ?? '—'}</td>
+                    <td>
+                      <Select
+                        aria-label={`Рынок ${item.class_code}`}
+                        options={MARKET_TYPE_OPTIONS}
+                        value={item.market_type ?? ''}
+                        disabled={savingClassCode === item.class_code}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          void handleClassMarketChange(
+                            item,
+                            raw === '' ? null : (raw as ClassMarketType),
+                          );
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+                {classes.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className={styles.empty}>
+                      Классы не найдены в таблице Classes
                     </td>
                   </tr>
                 )}

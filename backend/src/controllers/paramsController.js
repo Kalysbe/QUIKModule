@@ -1,6 +1,5 @@
 // controllers/paramsController.js
 import pgPool from "../config/dbPostgres.js";
-import pgKsePool from "../config/dbKse.js";
 
 const PARAMS_TABLE_NAME = "Params";
 const MAX_LIMIT = 1000;
@@ -234,11 +233,11 @@ export async function getAuctionParams(req, res, next) {
 
         conditions.push(`"${auctionIdColumn}" IS NOT NULL`);
 
-        const auctionClassesResult = await pgKsePool.query(
+        const auctionClassesResult = await pgPool.query(
             `
             SELECT DISTINCT class_code
-            FROM public.quik_class_registry
-            WHERE trade_segment_id = 1
+            FROM public.trade_class_rules
+            WHERE market_type = 'primary'
               AND class_code IS NOT NULL
               AND class_code <> ''
             `

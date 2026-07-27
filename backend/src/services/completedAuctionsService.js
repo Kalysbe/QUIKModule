@@ -4,7 +4,6 @@
  * round2(Math.round(365 / couponperiod) * couponvalue).
  */
 import pgPool from "../config/dbPostgres.js";
-import pgKsePool from "../config/dbKse.js";
 
 // KSE — Бишкек (UTC+6). Asia/Almaty с 2024 = UTC+5, для КР не подходит.
 const APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Bishkek";
@@ -164,11 +163,11 @@ async function getTableColumns(tableName) {
 }
 
 async function getAuctionClassCodes() {
-  const result = await pgKsePool.query(
+  const result = await pgPool.query(
     `
     SELECT DISTINCT class_code
-    FROM public.quik_class_registry
-    WHERE trade_segment_id = 1
+    FROM public.trade_class_rules
+    WHERE market_type = 'primary'
       AND class_code IS NOT NULL
       AND class_code <> ''
     `,

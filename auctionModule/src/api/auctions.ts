@@ -22,6 +22,7 @@ interface OrderApiItem {
   Value?: string;
   Yield?: string;
   OrderDateTime?: string;
+  WithdrawDateTime?: string;
   Operation?: string;
   State?: string;
   TradingAccount?: string;

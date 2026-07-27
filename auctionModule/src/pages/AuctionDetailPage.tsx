@@ -556,6 +556,7 @@ export default function AuctionDetailPage() {
             <ReportsPanel
               auction={auction}
               buyOrders={reportBuyOrders}
+              classificationBuyOrders={buyOrders}
               trades={trades}
               isMinfin
             />
@@ -1219,6 +1220,7 @@ export default function AuctionDetailPage() {
             <ReportsPanel
               auction={auction}
               buyOrders={reportBuyOrders}
+              classificationBuyOrders={buyOrders}
               trades={trades}
               isMinfin={isMinfinUser}
               isAdmin={isAdminUser}

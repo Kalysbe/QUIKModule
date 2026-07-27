@@ -1,5 +1,7 @@
 import type { Auction, BuyOrder } from '@/types/auction';
 import { NON_COMPETITIVE_SHARE } from '@/utils/allocation';
+import { isCancelledOrderState } from '@/utils/orderState';
+import { isWithdrawnAtAuctionEnd } from '@/utils/orderWithdraw';
 
 export interface OrderClassificationRow {
   dealerName: string;
@@ -35,11 +37,30 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Заявки для классификации: обычные + «Снята» только при WithdrawDateTime = окончание аукциона. */
+export function isIncludedInOrderClassification(
+  order: BuyOrder,
+  auction: Auction,
+): boolean {
+  if (
+    isWithdrawnAtAuctionEnd(
+      order.state,
+      order.withdrawDateTime,
+      auction.TradeDate,
+      auction.endtime,
+    )
+  ) {
+    return true;
+  }
+  return !isCancelledOrderState(order.state);
+}
+
 export function buildOrderClassificationReport(
   auction: Auction,
   buyOrders: BuyOrder[],
 ): OrderClassificationReportData {
   const sortedOrders = [...buyOrders]
+    .filter((order) => isIncludedInOrderClassification(order, auction))
     .sort((left, right) => {
       const leftIsNonCompetitive = left.price <= 0;
       const rightIsNonCompetitive = right.price <= 0;

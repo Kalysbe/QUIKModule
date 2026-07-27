@@ -1,5 +1,5 @@
--- Доработка реестра классов (уже развёрнутый quik_kse): длина кода, сегмент торгов
--- Выполнить: psql ... -d quik_kse -f sql/alter_quik_class_registry_v2.sql
+-- Доработка реестра классов (уже развёрнутый QuikExport): длина кода, сегмент торгов
+-- Выполнить: psql ... -d QuikExport -f sql/alter_quik_class_registry_v2.sql
 
 -- Длинные коды классов в некоторых выгрузках QUIK
 ALTER TABLE public.quik_class_registry

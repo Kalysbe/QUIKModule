@@ -11,6 +11,8 @@ import styles from './ReportsPanel.module.css';
 interface ReportsPanelProps {
   auction: Auction;
   buyOrders: BuyOrder[];
+  /** Заявки для классификации (включая «Снята» на окончании аукциона). */
+  classificationBuyOrders?: BuyOrder[];
   trades?: Trade[];
   isMinfin?: boolean;
   isAdmin?: boolean;
@@ -19,6 +21,7 @@ interface ReportsPanelProps {
 export function ReportsPanel({
   auction,
   buyOrders,
+  classificationBuyOrders,
   trades = [],
   isMinfin = false,
   isAdmin = false,
@@ -29,6 +32,7 @@ export function ReportsPanel({
     () => getAvailableReportOptions({ isMinfin, isAdmin, auctionCompleted }),
     [isMinfin, isAdmin, auctionCompleted],
   );
+  const ordersForClassification = classificationBuyOrders ?? buyOrders;
 
   const [activeReportId, setActiveReportId] = useState<ReportId>(
     () => availableOptions[0]?.id ?? 'summaryBids',
@@ -69,7 +73,7 @@ export function ReportsPanel({
       </p>
 
       {activeReportId === 'orderClassification' && classificationAvailable && (
-        <OrderClassificationReport auction={auction} buyOrders={buyOrders} />
+        <OrderClassificationReport auction={auction} buyOrders={ordersForClassification} />
       )}
       {activeReportId === 'summaryBids' && (
         <SummaryBidsReport auction={auction} buyOrders={buyOrders} />

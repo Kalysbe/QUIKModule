@@ -8,6 +8,10 @@ import {
   getFirmsDirectory,
   putFirmDirectory,
 } from "../controllers/firmStatusController.js";
+import {
+  getClassRegistry,
+  putClassRegistry,
+} from "../controllers/classRegistryController.js";
 
 const router = express.Router();
 
@@ -95,5 +99,25 @@ router.get("/firms", directoriesRequireRead, getFirmsDirectory);
  *     security: [{ bearerAuth: [] }]
  */
 router.put("/firms/:firmId", directoriesRequireWrite, putFirmDirectory);
+
+/**
+ * @swagger
+ * /api/kse/directories/class-registry:
+ *   get:
+ *     summary: Классы из QUIK Classes с назначением первичка/вторичка
+ *     tags: [KSE - Directories]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get("/class-registry", directoriesRequireRead, getClassRegistry);
+
+/**
+ * @swagger
+ * /api/kse/directories/class-registry/{classCode}:
+ *   put:
+ *     summary: Назначить классу первичка (primary) или вторичка (secondary)
+ *     tags: [KSE - Directories]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.put("/class-registry/:classCode", directoriesRequireWrite, putClassRegistry);
 
 export default router;

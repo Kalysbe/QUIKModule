@@ -69,7 +69,8 @@
 }
 
 .toolbar,
-.addRow {
+.addRow,
+.classForm {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -80,6 +81,16 @@
 .addRow > *:first-child {
   flex: 1 1 220px;
   max-width: 360px;
+}
+
+.classForm > * {
+  flex: 1 1 140px;
+  max-width: 220px;
+}
+
+.classForm > *:last-child {
+  flex: 0 0 auto;
+  max-width: none;
 }
 
 .tableWrap {

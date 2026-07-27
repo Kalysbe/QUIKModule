@@ -3,6 +3,8 @@ import {
   aggregateTradeStats,
   formatDateDdMmYyyy,
   isAuctionCompleted,
+  isWithdrawnAtAuctionEnd,
+  matchesAuctionEndDateTime,
   resolveAnnualCouponRate,
 } from "../completedAuctionsService.js";
 
@@ -60,6 +62,36 @@ describe("isAuctionCompleted", () => {
   });
 });
 
+describe("matchesAuctionEndDateTime / isWithdrawnAtAuctionEnd", () => {
+  test("matches wall-clock withdraw to TradeDate + endtime", () => {
+    expect(
+      matchesAuctionEndDateTime("2026-07-17T17:00:00", "2026-07-17", "17:00:00"),
+    ).toBe(true);
+    expect(
+      matchesAuctionEndDateTime("2026-07-17T16:59:59", "2026-07-17", "17:00:00"),
+    ).toBe(false);
+  });
+
+  test("only «Снята» at auction end counts", () => {
+    expect(
+      isWithdrawnAtAuctionEnd(
+        "Снята",
+        "2026-07-17T17:00:00",
+        "2026-07-17",
+        "17:00:00",
+      ),
+    ).toBe(true);
+    expect(
+      isWithdrawnAtAuctionEnd(
+        "Отменена",
+        "2026-07-17T17:00:00",
+        "2026-07-17",
+        "17:00:00",
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("aggregateDemandVolume", () => {
   test("sums buy order qty and skips cancelled", () => {
     const volume = aggregateDemandVolume([
@@ -69,6 +101,32 @@ describe("aggregateDemandVolume", () => {
       { Operation: "Продажа", State: "Активна", Qty: 100, Value: 100, Price: 90 },
     ]);
     expect(volume).toBe(1500);
+  });
+
+  test("includes «Снята» when WithdrawDateTime matches auction end", () => {
+    const volume = aggregateDemandVolume(
+      [
+        { Operation: "Купля", State: "Активна", Qty: 1000, Value: 90000, Price: 90 },
+        {
+          Operation: "Купля",
+          State: "Снята",
+          Qty: 200,
+          Value: 18000,
+          Price: 90,
+          WithdrawDateTime: "2026-07-17T17:00:00",
+        },
+        {
+          Operation: "Купля",
+          State: "Снята",
+          Qty: 50,
+          Value: 4500,
+          Price: 90,
+          WithdrawDateTime: "2026-07-17T10:00:00",
+        },
+      ],
+      { tradeDate: "2026-07-17", endtime: "17:00:00" },
+    );
+    expect(volume).toBe(1200);
   });
 });
 

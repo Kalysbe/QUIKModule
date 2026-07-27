@@ -191,6 +191,70 @@ function isCancelledOrderState(state) {
   );
 }
 
+/** Нормализует дату-время к `YYYY-MM-DDTHH:MM:SS` (стеновое время без TZ). */
+export function toWallDateTimeKey(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: APP_TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+        .formatToParts(value)
+        .map((p) => [p.type, p.value]),
+    );
+    const hour = parts.hour === "24" ? "00" : parts.hour;
+    if (!parts.year || !parts.month || !parts.day || hour == null || !parts.minute || !parts.second) {
+      return null;
+    }
+    return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${parts.second}`;
+  }
+
+  const s = String(value).trim();
+  if (!s) return null;
+
+  const wall = s.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/,
+  );
+  if (wall && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+    const hh = String(Number(wall[4])).padStart(2, "0");
+    const ss = wall[6] ?? "00";
+    return `${wall[1]}-${wall[2]}-${wall[3]}T${hh}:${wall[5]}:${ss}`;
+  }
+
+  const parsed = new Date(s);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toWallDateTimeKey(parsed);
+}
+
+export function getAuctionEndDateTimeKey(tradeDate, endtime) {
+  const dateKey = normalizeIsoDate(tradeDate);
+  const timeKey = normalizeTimeOfDay(endtime);
+  if (!dateKey || !timeKey) return null;
+  return `${dateKey}T${timeKey}`;
+}
+
+export function matchesAuctionEndDateTime(withdrawDateTime, tradeDate, endtime) {
+  const withdrawKey = toWallDateTimeKey(withdrawDateTime);
+  const endKey = getAuctionEndDateTimeKey(tradeDate, endtime);
+  if (!withdrawKey || !endKey) return false;
+  return withdrawKey === endKey;
+}
+
+/** «Снята» ровно в момент окончания аукциона (как в классификации заявок). */
+export function isWithdrawnAtAuctionEnd(state, withdrawDateTime, tradeDate, endtime) {
+  const normalized = String(state ?? "").toLowerCase();
+  if (!normalized.includes("снят")) return false;
+  if (!isCancelledOrderState(state)) return false;
+  return matchesAuctionEndDateTime(withdrawDateTime, tradeDate, endtime);
+}
+
 function isBuyOperation(operation) {
   return String(operation ?? "").toLowerCase().includes("куп");
 }
@@ -218,13 +282,29 @@ function auctionKey(classCode, secCode, tradeDate) {
 }
 
 /**
- * Спрос по заявкам: сумма Qty покупок без снятых/отменённых.
+ * Спрос по заявкам: сумма Qty покупок.
+ * Снятые/отменённые не считаем, кроме «Снята» с WithdrawDateTime = окончание аукциона.
+ * @param {object[]} orders
+ * @param {{ tradeDate?: string|null, endtime?: string|null }} [auction]
  */
-export function aggregateDemandVolume(orders) {
+export function aggregateDemandVolume(orders, auction = {}) {
+  const tradeDate = auction.tradeDate ?? null;
+  const endtime = auction.endtime ?? null;
   let sum = 0;
   for (const order of orders) {
     if (!isBuyOperation(order.Operation)) continue;
-    if (isCancelledOrderState(order.State)) continue;
+    if (isCancelledOrderState(order.State)) {
+      if (
+        !isWithdrawnAtAuctionEnd(
+          order.State,
+          order.WithdrawDateTime,
+          tradeDate,
+          endtime,
+        )
+      ) {
+        continue;
+      }
+    }
     sum += resolveQuantity(order.Qty, order.Value, order.Price);
   }
   return round2(sum);
@@ -395,6 +475,13 @@ async function loadOrdersForKeys(keys) {
       "OrderDate",
       "orderdate",
     ]),
+    WithdrawDateTime: resolveColumn(names, [
+      "WithdrawDateTime",
+      "withdrawdatetime",
+      "withdraw_date_time",
+      "WithdrawTime",
+      "withdrawtime",
+    ]),
   };
 
   if (!col.SecCode || !col.OrderDateTime) return new Map();
@@ -410,6 +497,9 @@ async function loadOrdersForKeys(keys) {
     col.Value ? `"${col.Value}" AS "Value"` : `0 AS "Value"`,
     col.Operation ? `"${col.Operation}" AS "Operation"` : `'' AS "Operation"`,
     col.State ? `"${col.State}" AS "State"` : `'' AS "State"`,
+    col.WithdrawDateTime
+      ? `to_char("${col.WithdrawDateTime}", 'YYYY-MM-DD"T"HH24:MI:SS') AS "WithdrawDateTime"`
+      : `NULL::text AS "WithdrawDateTime"`,
     `to_char("${col.OrderDateTime}"::date, 'YYYY-MM-DD') AS "TradeDate"`,
   ];
 
@@ -552,7 +642,10 @@ export async function getCompletedAuctions(options = {}) {
       date: formatDateDdMmYyyy(row.TradeDate),
       secCode: row.SecCode ?? null,
       issueVolume: toNumber(row.issuesize),
-      demandVolume: aggregateDemandVolume(orders),
+      demandVolume: aggregateDemandVolume(orders, {
+        tradeDate: row.TradeDate,
+        endtime: row.endtime,
+      }),
       dealVolume: tradeStats.dealVolume,
       minYield: tradeStats.minYield,
       maxYield: tradeStats.maxYield,

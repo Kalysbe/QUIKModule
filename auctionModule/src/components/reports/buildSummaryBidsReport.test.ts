@@ -215,4 +215,43 @@ describe('buildSummaryBidsReport', () => {
       yieldByPrice: 15.5,
     });
   });
+
+  it('includes «Снята» at auction end in demand like classification', () => {
+    const auctionWithEnd: Auction = {
+      ...auction,
+      endtime: '17:00:00',
+    };
+    const orders = [
+      makeOrder({
+        orderId: '1',
+        price: 90,
+        quantity: 1000,
+        amount: 100_000,
+      }),
+      makeOrder({
+        orderId: '2',
+        state: 'Снята',
+        isActive: false,
+        isReportable: false,
+        withdrawDateTime: '2026-06-11T17:00:00',
+        price: 91,
+        quantity: 500,
+        amount: 50_000,
+      }),
+      makeOrder({
+        orderId: '3',
+        state: 'Снята',
+        isActive: false,
+        isReportable: false,
+        withdrawDateTime: '2026-06-11T10:00:00',
+        price: 92,
+        quantity: 200,
+        amount: 20_000,
+      }),
+    ];
+
+    const report = buildSummaryBidsReport(auctionWithEnd, orders);
+    expect(report.total.nominalValue).toBe(150_000);
+    expect(report.total.quantity).toBe(1500);
+  });
 });

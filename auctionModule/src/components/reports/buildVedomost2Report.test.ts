@@ -413,4 +413,33 @@ describe('buildVedomost2Report', () => {
     const metrics = computeVedomost2Metrics(auction, orders, [], { cutOffPrice: 90.32 });
     expect(metrics.placementVolumeThousands).toBe(214_420);
   });
+
+  it('uses classification demand set for «Объем спроса»', () => {
+    const auctionWithEnd: Auction = {
+      ...auction,
+      endtime: '17:00:00',
+    };
+    const reportable = [
+      makeOrder({ orderId: '1', price: 90.32, quantity: 1_000, desiredYield: 10.6 }),
+    ];
+    const withdrawnAtEnd = makeOrder({
+      orderId: '2',
+      state: 'Снята',
+      isActive: false,
+      isReportable: false,
+      withdrawDateTime: '2026-06-11T17:00:00',
+      price: 91,
+      quantity: 500,
+      desiredYield: 9,
+    });
+
+    const metrics = computeVedomost2Metrics(auctionWithEnd, reportable, [], {
+      cutOffPrice: 90.32,
+      demandBuyOrders: [...reportable, withdrawnAtEnd],
+    });
+
+    // (1000 + 500) × 100 / 1000 = 150
+    expect(metrics.demandVolumeThousands).toBe(150);
+    expect(metrics.placementVolumeThousands).toBe(100);
+  });
 });

@@ -76,10 +76,15 @@ export function ReportsPanel({
         <OrderClassificationReport auction={auction} buyOrders={ordersForClassification} />
       )}
       {activeReportId === 'summaryBids' && (
-        <SummaryBidsReport auction={auction} buyOrders={buyOrders} />
+        <SummaryBidsReport auction={auction} buyOrders={ordersForClassification} />
       )}
       {activeReportId === 'vedomost2' && (
-        <Vedomost2Report auction={auction} buyOrders={buyOrders} trades={trades} />
+        <Vedomost2Report
+          auction={auction}
+          buyOrders={buyOrders}
+          demandBuyOrders={ordersForClassification}
+          trades={trades}
+        />
       )}
       {activeReportId === 'centralDepository' && !isMinfin && (
         <CentralDepositoryReport auction={auction} buyOrders={buyOrders} />

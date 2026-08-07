@@ -3,6 +3,7 @@ import type { Auction, BuyOrder } from '@/types/auction';
 import {
   buildOrderClassificationReport,
   isIncludedInOrderClassification,
+  sumClassificationDemandNominal,
 } from './buildOrderClassificationReport';
 
 function makeOrder(partial: Partial<BuyOrder> & Pick<BuyOrder, 'orderId'>): BuyOrder {
@@ -116,5 +117,8 @@ describe('buildOrderClassificationReport', () => {
       ['Active', 'AtEnd'].sort(),
     );
     expect(report.totalNominalValue).toBe(1_500);
+    expect(sumClassificationDemandNominal(auction, [atEnd, early, active])).toBe(
+      report.totalNominalValue,
+    );
   });
 });

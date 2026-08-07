@@ -11,7 +11,7 @@ import {
   getOrderYield,
   toWholeBonds,
 } from '@/utils/allocation';
-import { getOrderNominalValue } from './buildSummaryBidsReport';
+import { sumClassificationDemandNominal } from './buildOrderClassificationReport';
 
 const FACE_VALUE = 100;
 
@@ -203,6 +203,8 @@ export function computeAuctionComparisonMetrics(
   options: {
     preliminary?: PreliminaryCalculation | null;
     cutOffPrice?: number;
+    /** Заявки для объёма спроса — как в классификации (включая «Снята» на окончании). */
+    demandBuyOrders?: BuyOrder[];
   } = {},
 ): AuctionComparisonMetrics {
   const preliminary = options.preliminary ?? null;
@@ -218,9 +220,9 @@ export function computeAuctionComparisonMetrics(
   const orderById = new Map(buyOrders.map((order) => [order.orderId, order]));
 
   const competitiveOrders = buyOrders.filter((order) => order.price > 0);
-  const demandNominal = buyOrders.reduce(
-    (sum, order) => sum + getOrderNominalValue(order),
-    0,
+  const demandNominal = sumClassificationDemandNominal(
+    auction,
+    options.demandBuyOrders ?? buyOrders,
   );
 
   let maxPrice: number | null = null;
@@ -422,12 +424,14 @@ export function computeAuctionComparisonMetricsFromTrades(
   buyOrders: BuyOrder[],
   options: {
     preliminary?: PreliminaryCalculation | null;
+    /** Заявки для объёма спроса — как в классификации (включая «Снята» на окончании). */
+    demandBuyOrders?: BuyOrder[];
   } = {},
 ): AuctionComparisonMetrics {
   const preliminary = options.preliminary ?? null;
-  const demandNominal = buyOrders.reduce(
-    (sum, order) => sum + getOrderNominalValue(order),
-    0,
+  const demandNominal = sumClassificationDemandNominal(
+    auction,
+    options.demandBuyOrders ?? buyOrders,
   );
 
   const orderByNum = new Map<string, BuyOrder>();
@@ -513,6 +517,8 @@ export function computeVedomost2Metrics(
   options: {
     preliminary?: PreliminaryCalculation | null;
     cutOffPrice?: number;
+    /** Заявки для объёма спроса — как в классификации (включая «Снята» на окончании). */
+    demandBuyOrders?: BuyOrder[];
   } = {},
 ): AuctionComparisonMetrics {
   if (trades.length > 0) {

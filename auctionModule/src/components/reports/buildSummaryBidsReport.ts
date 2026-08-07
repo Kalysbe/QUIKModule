@@ -1,5 +1,6 @@
 import type { Auction, BuyOrder } from '@/types/auction';
 import { getOrderYield, sortOrdersByYieldAsc } from '@/utils/allocation';
+import { isIncludedInOrderClassification } from './buildOrderClassificationReport';
 
 /** Номинал одной ГЦБ (сом) — стандарт для аукционов ГКВ/ГКО. */
 const FACE_VALUE = 100;
@@ -265,10 +266,14 @@ export function buildSummaryBidsReport(
   buyOrders: BuyOrder[],
   firmStatuses: Record<string, FirmStatusLookup> = {},
 ): SummaryBidsReportData {
-  const competitiveOrders = sortOrdersByYieldAsc(
-    buyOrders.filter((order) => order.price > 0),
+  // Тот же набор заявок, что в «Классификации»: reportable + «Снята» на окончании.
+  const demandOrders = buyOrders.filter((order) =>
+    isIncludedInOrderClassification(order, auction),
   );
-  const nonCompetitiveOrders = buyOrders.filter((order) => order.price === 0);
+  const competitiveOrders = sortOrdersByYieldAsc(
+    demandOrders.filter((order) => order.price > 0),
+  );
+  const nonCompetitiveOrders = demandOrders.filter((order) => order.price === 0);
 
   let cumulativeNominal = 0;
   let cumulativeReceipts = 0;
@@ -340,7 +345,7 @@ export function buildSummaryBidsReport(
     competitiveTotals.actualValue + nonCompetitiveTotals.actualValue,
   );
 
-  const participantStats = countParticipantsByFirmStatus(buyOrders, firmStatuses);
+  const participantStats = countParticipantsByFirmStatus(demandOrders, firmStatuses);
 
   const securitiesQuantity = toNumber(auction.issuesize);
   const { kind, circulationDays, circulationYears } = describeSecurity(auction.SecCode);

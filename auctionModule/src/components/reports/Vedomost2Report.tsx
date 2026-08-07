@@ -9,7 +9,8 @@ import {
 import { formatReportMoney, formatReportPercent, formatShortDate } from '@/utils/format';
 import { downloadCsv } from '@/utils/download';
 import { resolveOrderQuantity } from '@/utils/allocation';
-import { isReportableOrderState } from '@/utils/orderState';
+import { isCancelledOrderState, isReportableOrderState } from '@/utils/orderState';
+import { isWithdrawnAtAuctionEnd } from '@/utils/orderWithdraw';
 import {
   buildVedomost2Report,
   computeVedomost2Metrics,
@@ -22,6 +23,8 @@ import styles from './Vedomost2Report.module.css';
 interface Vedomost2ReportProps {
   auction: Auction;
   buyOrders: BuyOrder[];
+  /** Заявки для объёма спроса — как в классификации (включая «Снята» на окончании). */
+  demandBuyOrders?: BuyOrder[];
   trades?: Trade[];
 }
 
@@ -37,18 +40,31 @@ function getOrderYieldFromApi(price: number, yieldValue: number): number {
   return 0;
 }
 
-async function loadBuyOrders(target: Auction): Promise<BuyOrder[]> {
-  if (!target.ClassCode || !target.SecCode) return [];
+async function loadBuyOrders(target: Auction): Promise<{
+  reportable: BuyOrder[];
+  forDemand: BuyOrder[];
+}> {
+  if (!target.ClassCode || !target.SecCode) {
+    return { reportable: [], forDemand: [] };
+  }
   const orders = await getOrdersByInstrument(
     target.ClassCode,
     target.SecCode,
     target.TradeDate,
   );
 
-  return orders
+  const mapped = orders
     .filter((order) => {
       const operation = (order.Operation ?? '').toLowerCase();
-      return operation.includes('куп');
+      if (!operation.includes('куп')) return false;
+      if (!isCancelledOrderState(order.State)) return true;
+      // «Снята» — только если снята в момент окончания аукциона (для спроса/классификации).
+      return isWithdrawnAtAuctionEnd(
+        order.State,
+        order.WithdrawDateTime,
+        target.TradeDate,
+        target.endtime,
+      );
     })
     .map((order) => {
       const price = toNumber(order.Price);
@@ -75,11 +91,16 @@ async function loadBuyOrders(target: Auction): Promise<BuyOrder[]> {
           '—',
         submittedAt: order.OrderDateTime ?? '—',
         state,
+        withdrawDateTime: order.WithdrawDateTime ?? null,
         isActive: true,
         isReportable: isReportableOrderState(order.State),
       };
-    })
-    .filter((order) => order.isReportable);
+    });
+
+  return {
+    reportable: mapped.filter((order) => order.isReportable),
+    forDemand: mapped,
+  };
 }
 
 async function loadTrades(target: Auction): Promise<Trade[]> {
@@ -161,7 +182,13 @@ function PlacementRow({
   );
 }
 
-export function Vedomost2Report({ auction, buyOrders, trades = [] }: Vedomost2ReportProps) {
+export function Vedomost2Report({
+  auction,
+  buyOrders,
+  demandBuyOrders,
+  trades = [],
+}: Vedomost2ReportProps) {
+  const ordersForDemand = demandBuyOrders ?? buyOrders;
   const [currentPreliminary, setCurrentPreliminary] = useState<
     Awaited<ReturnType<typeof getLatestPreliminaryCalculation>>
   >(null);
@@ -203,9 +230,15 @@ export function Vedomost2Report({ auction, buyOrders, trades = [] }: Vedomost2Re
 
         if (cancelled) return;
         setPreviousMetrics(
-          computeVedomost2Metrics(previousAuction, previousOrders, previousTrades, {
-            preliminary: previousPreliminary,
-          }),
+          computeVedomost2Metrics(
+            previousAuction,
+            previousOrders.reportable,
+            previousTrades,
+            {
+              preliminary: previousPreliminary,
+              demandBuyOrders: previousOrders.forDemand,
+            },
+          ),
         );
       } catch {
         if (!cancelled) {
@@ -226,8 +259,9 @@ export function Vedomost2Report({ auction, buyOrders, trades = [] }: Vedomost2Re
     () =>
       computeVedomost2Metrics(auction, buyOrders, trades, {
         preliminary: currentPreliminary,
+        demandBuyOrders: ordersForDemand,
       }),
-    [auction, buyOrders, trades, currentPreliminary],
+    [auction, buyOrders, ordersForDemand, trades, currentPreliminary],
   );
 
   const report = useMemo(

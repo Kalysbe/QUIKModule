@@ -55,6 +55,24 @@ export function isIncludedInOrderClassification(
   return !isCancelledOrderState(order.state);
 }
 
+/** Номинал заявки в классификации (сом): Qty × 100. */
+export function getClassificationOrderNominalValue(order: BuyOrder): number {
+  return round2(order.quantity * 100);
+}
+
+/**
+ * Объём спроса по номиналу (сом) — та же сумма «Итого», что в классификации заявок.
+ * Используется в сводной ведомости и в поле спроса ведомости 2.
+ */
+export function sumClassificationDemandNominal(
+  auction: Auction,
+  buyOrders: BuyOrder[],
+): number {
+  return buyOrders
+    .filter((order) => isIncludedInOrderClassification(order, auction))
+    .reduce((sum, order) => sum + getClassificationOrderNominalValue(order), 0);
+}
+
 export function buildOrderClassificationReport(
   auction: Auction,
   buyOrders: BuyOrder[],
@@ -80,7 +98,7 @@ export function buildOrderClassificationReport(
 
   const rows: OrderClassificationRow[] = sortedOrders.map((order) => ({
     dealerName: order.firmName || '—',
-    nominalValue: round2(order.quantity * 100),
+    nominalValue: getClassificationOrderNominalValue(order),
     bidPrice: order.price,
     yieldPercent: getOrderYield(order),
   }));
@@ -89,7 +107,7 @@ export function buildOrderClassificationReport(
   // Лимит неконкурентных — строго 30% от объёма выпуска.
   const nonCompetitiveAmount = round2(issueVolume * NON_COMPETITIVE_SHARE);
 
-  const totalNominalValue = rows.reduce((sum, row) => sum + row.nominalValue, 0);
+  const totalNominalValue = sumClassificationDemandNominal(auction, buyOrders);
 
   return {
     auctionId: auction.auction_id ?? auction.SecCode ?? '',

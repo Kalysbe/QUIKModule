@@ -251,7 +251,8 @@ describe('buildVedomost2Report', () => {
     expect(metrics.nonCompetitive.nominalValue).toBe(360_000);
     expect(metrics.total.quantity).toBe(12_000);
     expect(metrics.total.nominalValue).toBe(1_200_000);
-    expect(metrics.offerVolumeThousands).toBe(1_200);
+    // issuesize из классификации × 100 (3000000 × 100 → 300000 тыс.).
+    expect(metrics.offerVolumeThousands).toBe(300_000);
     expect(metrics.placementVolumeThousands).toBe(1_200);
   });
 

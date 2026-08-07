@@ -11,7 +11,7 @@ import {
   getOrderYield,
   toWholeBonds,
 } from '@/utils/allocation';
-import { sumClassificationDemandNominal } from './buildOrderClassificationReport';
+import { sumClassificationDemandNominal, getClassificationIssueVolume } from './buildOrderClassificationReport';
 
 const FACE_VALUE = 100;
 
@@ -307,12 +307,15 @@ export function computeAuctionComparisonMetrics(
   const displayCutOffPrice = lowestPriceHighestYieldOrder?.price ?? null;
   const yieldAtCutOff = lowestPriceHighestYieldOrder?.yieldPercent ?? null;
 
-  const offerNominal = resolveOfferedQty(auction, preliminary) * FACE_VALUE;
+  // «Объем выпуска» из классификации (issuesize) × 100 сом, в тыс. сомах.
+  const offerVolumeThousands = toThousands(
+    getClassificationIssueVolume(auction) * FACE_VALUE,
+  );
 
   return {
     secCode: auction.SecCode ?? '—',
     tradeDate: auction.TradeDate,
-    offerVolumeThousands: toThousands(offerNominal),
+    offerVolumeThousands,
     demandVolumeThousands: toThousands(demandNominal),
     placementVolumeThousands: toThousands(total.nominalValue),
     weightedAveragePrice: competitive.weightedAveragePrice,
@@ -397,12 +400,15 @@ function finalizePlacementMetrics(
   const lowestPriceHighestYieldOrder = pickLowestPriceHighestYieldOrder(
     competitivePriceYield,
   );
-  const offerNominal = resolveOfferedQty(auction, preliminary) * FACE_VALUE;
+  // «Объем выпуска» из классификации (issuesize) × 100 сом, в тыс. сомах.
+  const offerVolumeThousands = toThousands(
+    getClassificationIssueVolume(auction) * FACE_VALUE,
+  );
 
   return {
     secCode: auction.SecCode ?? '—',
     tradeDate: auction.TradeDate,
-    offerVolumeThousands: toThousands(offerNominal),
+    offerVolumeThousands,
     demandVolumeThousands: toThousands(demandNominal),
     placementVolumeThousands: toThousands(total.nominalValue),
     weightedAveragePrice: competitive.weightedAveragePrice,

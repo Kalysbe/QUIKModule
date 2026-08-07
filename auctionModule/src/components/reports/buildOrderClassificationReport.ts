@@ -37,6 +37,11 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** «Объем выпуска (сом)» в классификации заявок — значение issuesize как есть. */
+export function getClassificationIssueVolume(auction: Auction): number {
+  return toNumber(auction.issuesize);
+}
+
 /** Заявки для классификации: обычные + «Снята» только при WithdrawDateTime = окончание аукциона. */
 export function isIncludedInOrderClassification(
   order: BuyOrder,
@@ -103,7 +108,7 @@ export function buildOrderClassificationReport(
     yieldPercent: getOrderYield(order),
   }));
 
-  const issueVolume = toNumber(auction.issuesize);
+  const issueVolume = getClassificationIssueVolume(auction);
   // Лимит неконкурентных — строго 30% от объёма выпуска.
   const nonCompetitiveAmount = round2(issueVolume * NON_COMPETITIVE_SHARE);
 

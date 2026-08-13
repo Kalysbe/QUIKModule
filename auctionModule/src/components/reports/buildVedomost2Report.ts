@@ -11,6 +11,7 @@ import {
   getOrderYield,
   toWholeBonds,
 } from '@/utils/allocation';
+import { toDateKey } from '@/utils/auctionDate';
 import { sumClassificationDemandNominal, getClassificationIssueVolume } from './buildOrderClassificationReport';
 
 const FACE_VALUE = 100;
@@ -85,13 +86,36 @@ function parseTradeTime(value: string | null | undefined): number {
   return Number.isFinite(time) ? time : 0;
 }
 
+function normalizeSecCode(value: string | null | undefined): string {
+  return (value ?? '').trim().toUpperCase();
+}
+
+/** Текущая строка аукциона, а не все даты того же инструмента. */
+function isCurrentAuction(item: Auction, current: Auction): boolean {
+  const currentId = current.auction_id != null ? String(current.auction_id).trim() : '';
+  const itemId = item.auction_id != null ? String(item.auction_id).trim() : '';
+  const currentDate = toDateKey(current.TradeDate);
+  const itemDate = toDateKey(item.TradeDate);
+
+  if (currentId && itemId && currentId === itemId) {
+    if (currentDate && itemDate) return currentDate === itemDate;
+    return true;
+  }
+
+  return (
+    Boolean(currentDate) &&
+    currentDate === itemDate &&
+    normalizeSecCode(current.SecCode) === normalizeSecCode(item.SecCode)
+  );
+}
+
 /** Одна серия ГЦБ: одинаковый срок (GD052… / GBA05…). */
 export function isSameSecuritySeries(
   left: string | undefined,
   right: string | undefined,
 ): boolean {
-  const a = (left ?? '').trim().toUpperCase();
-  const b = (right ?? '').trim().toUpperCase();
+  const a = normalizeSecCode(left);
+  const b = normalizeSecCode(right);
   if (!a || !b) return false;
   if (a.startsWith('GD') && b.startsWith('GD')) return a.slice(0, 5) === b.slice(0, 5);
   if (a.startsWith('GBA') && b.startsWith('GBA')) return a.slice(0, 5) === b.slice(0, 5);
@@ -102,20 +126,29 @@ export function findPreviousAuction(
   current: Auction,
   auctions: Auction[],
 ): Auction | null {
-  const currentId = current.auction_id ?? current.SecCode;
   const currentTime = parseTradeTime(current.TradeDate);
-  const candidates = auctions
-    .filter((item) => {
-      const id = item.auction_id ?? item.SecCode;
-      if (!id || id === currentId) return false;
-      if (!isSameSecuritySeries(current.SecCode, item.SecCode)) return false;
-      const time = parseTradeTime(item.TradeDate);
-      if (currentTime > 0 && time > 0) return time < currentTime;
-      return true;
-    })
-    .sort((left, right) => parseTradeTime(right.TradeDate) - parseTradeTime(left.TradeDate));
+  const candidates = auctions.filter((item) => {
+    if (isCurrentAuction(item, current)) return false;
+    if (!isSameSecuritySeries(current.SecCode, item.SecCode)) return false;
+    const time = parseTradeTime(item.TradeDate);
+    if (currentTime > 0 && time > 0) return time < currentTime;
+    return true;
+  });
 
-  return candidates[0] ?? null;
+  if (candidates.length === 0) return null;
+
+  const latestPrevious = [...candidates].sort(
+    (left, right) => parseTradeTime(right.TradeDate) - parseTradeTime(left.TradeDate),
+  )[0]!;
+  const previousInstrument = normalizeSecCode(latestPrevious.SecCode);
+  const sameInstrument = candidates.filter(
+    (item) => normalizeSecCode(item.SecCode) === previousInstrument,
+  );
+
+  // Один инструмент мог размещаться дважды в разные дни — берём более раннюю дату.
+  return [...sameInstrument].sort(
+    (left, right) => parseTradeTime(left.TradeDate) - parseTradeTime(right.TradeDate),
+  )[0] ?? null;
 }
 
 function resolveCutOffPrice(

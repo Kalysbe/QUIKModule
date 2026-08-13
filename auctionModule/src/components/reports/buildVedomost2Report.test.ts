@@ -281,6 +281,36 @@ describe('buildVedomost2Report', () => {
     expect(previous?.SecCode).toBe('GD052270524');
   });
 
+  it('picks the earlier date when the previous instrument was auctioned twice', () => {
+    const current: Auction = {
+      auction_id: 'cur-816',
+      SecCode: 'GD052270816',
+      TradeDate: '2026-08-13',
+    };
+
+    const previous = findPreviousAuction(current, [
+      {
+        auction_id: 'later-placement',
+        SecCode: 'GD052270726',
+        TradeDate: '2026-07-27',
+      },
+      {
+        auction_id: 'first-placement',
+        SecCode: 'GD052270726',
+        TradeDate: '2026-06-27',
+      },
+      {
+        auction_id: 'older-issue',
+        SecCode: 'GD052270524',
+        TradeDate: '2026-05-21',
+      },
+    ]);
+
+    expect(previous?.TradeDate).toBe('2026-06-27');
+    expect(previous?.SecCode).toBe('GD052270726');
+    expect(previous?.auction_id).toBe('first-placement');
+  });
+
   it('uses trades from DB when they are available', () => {
     const orders = [
       makeOrder({ orderId: '1', price: 90.32, quantity: 2_144_200, desiredYield: 10.6 }),
